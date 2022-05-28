@@ -1,0 +1,9 @@
+#set($inputRoot = $input.path('$'))
+## The next line changes the HTTP response code with the one provided by the Lambda Function
+#set($context.responseOverride.status = $inputRoot.statusCode)
+## Decoding base64 (this could have been left to the application)
+#if( $inputRoot.isBase64Encoded == true )
+$util.base64Decode($inputRoot.body)
+#else
+$inputRoot.body
+#end

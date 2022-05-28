@@ -1,0 +1,19 @@
+Test event
+
+DirectIntegration
+
+{
+  "params": {
+    "path": {},
+    "querystring": {
+      "sessionId": "TheTestSession"
+    }
+  }
+}
+
+
+DirectMissingSession  { "params": { "path": {}, "querystring": {} } }
+DirectWrongSession  {"params": {"path": {}, "querystring": {"sessionId": "WRONG"} } }
+ProxyIntegration  { "queryStringParameters": { "sessionId": "TheTestSession" } }
+ProxyWrongSession { "queryStringParameters": { "sessionId": "WRONG" } }
+ProxyMissingSession { "queryStringParameters": {} }
