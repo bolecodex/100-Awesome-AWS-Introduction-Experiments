@@ -1,0 +1,675 @@
+Description:  This template deploys 3 VPCs, creates new security group, deploys EC2 instance in a given VPC, and assigns a IAM role for SSM
+
+Parameters:
+  VPCAName:
+    Description: Please enter the name for this VPC
+    Type: String
+    Default: VPC A
+
+  VPCACIDR:
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: String
+    Default: 10.0.0.0/16
+
+  VPCASubnet1CIDR:
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
+    Type: String
+    Default: 10.0.0.0/24
+
+  VPCASubnet2CIDR:
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone
+    Type: String
+    Default: 10.0.1.0/24
+
+  VPCASubnet3CIDR:
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: Please enter the IP range (CIDR notation) for the TGW subnet in the first Availability Zone
+    Type: String
+    Default: 10.0.2.0/28
+
+  VPCASubnet4CIDR:
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: Please enter the IP range (CIDR notation) for the TGW subnet in the second Availability Zone
+    Type: String
+    Default: 10.0.3.0/28
+
+  VPCBName:
+    Description: Please enter the name for this VPC
+    Type: String
+    Default: VPC B
+
+  VPCBCIDR:
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: String
+    Default: 10.1.0.0/16
+
+  VPCBSubnet1CIDR:
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
+    Type: String
+    Default: 10.1.0.0/24
+
+  VPCBSubnet2CIDR:
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone
+    Type: String
+    Default: 10.1.1.0/24
+
+  VPCBSubnet3CIDR:
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: Please enter the IP range (CIDR notation) for the TGW subnet in the first Availability Zone
+    Type: String
+    Default: 10.1.2.0/28
+
+  VPCBSubnet4CIDR:
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: Please enter the IP range (CIDR notation) for the TGW subnet in the second Availability Zone
+    Type: String
+    Default: 10.1.3.0/28
+
+  VPCCName:
+    Description: Please enter the name for this VPC
+    Type: String
+    Default: VPC C
+
+  VPCCCIDR:
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: String
+    Default: 10.2.0.0/16
+
+  VPCCSubnet1CIDR:
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
+    Type: String
+    Default: 10.2.0.0/24
+
+  VPCCSubnet2CIDR:
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone
+    Type: String
+    Default: 10.2.1.0/24
+
+  VPCCSubnet3CIDR:
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: Please enter the IP range (CIDR notation) for the TGW subnet in the first Availability Zone
+    Type: String
+    Default: 10.2.2.0/28
+
+  VPCCSubnet4CIDR:
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Description: Please enter the IP range (CIDR notation) for the TGW subnet in the second Availability Zone
+    Type: String
+    Default: 10.2.3.0/28
+
+    ###
+
+  InstanceNameVPCA:
+    Description: EC2 Instance Name
+    Type: String
+    Default: EC2 VPC A - AZ1
+
+  InstanceNameVPCB:
+    Description: EC2 Instance Name
+    Type: String
+    Default: EC2 VPC B - AZ1
+
+  InstanceNameVPCC:
+    Description: EC2 Instance Name
+    Type: String
+    Default: EC2 VPC C - AZ1
+
+  InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+    - t2.nano
+    - t2.micro
+    - t2.small
+    - t2.medium
+    - t2.large
+    - t2.xlarge
+    - t2.2xlarge
+    - t3.nano
+    - t3.micro
+    - t3.small
+    - t3.medium
+    - t3.large
+    - t3.xlarge
+    - t3.2xlarge
+
+  SSHLocation:
+    Description: The IP address range that can be used to SSH to the EC2 instances
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 0.0.0.0/0
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+
+  LatestAmiId:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+
+Resources:
+  VPCA:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCACIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Ref VPCAName
+
+  InternetGateway1:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCAName} - IGW
+
+  InternetGatewayAttachment1:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway1
+      VpcId: !Ref VPCA
+
+  VPCASubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPCA
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref VPCASubnet1CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCAName} - AZ1
+
+  VPCASubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPCA
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !Ref VPCASubnet2CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCAName} - AZ2
+
+  VPCASubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPCA
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref VPCASubnet3CIDR
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCAName} - AZ1 TGW
+
+  VPCASubnet4:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPCA
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !Ref VPCASubnet4CIDR
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCAName} - AZ2 TGW
+
+  PublicRouteTableVPCA:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPCA
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCAName} Route Table
+
+  DefaultPublicRoute1:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment1
+    Properties:
+      RouteTableId: !Ref PublicRouteTableVPCA
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway1
+
+  VPCASubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTableVPCA
+      SubnetId: !Ref VPCASubnet1
+
+  VPCASubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTableVPCA
+      SubnetId: !Ref VPCASubnet2
+
+  VPCB:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCBCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Ref VPCBName
+
+  InternetGateway2:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCBName} - IGW
+
+  InternetGatewayAttachment2:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway2
+      VpcId: !Ref VPCB
+
+  VPCBSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPCB
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref VPCBSubnet1CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCBName} - AZ1
+
+  VPCBSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPCB
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !Ref VPCBSubnet2CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCBName} - AZ2
+
+  VPCBSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPCB
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref VPCBSubnet3CIDR
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCBName} - AZ1 TGW
+
+  VPCBSubnet4:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPCB
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !Ref VPCBSubnet4CIDR
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCBName} - AZ2 TGW
+
+  PublicRouteTableVPCB:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPCB
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCBName} Route Table
+
+  DefaultPublicRoute2:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment2
+    Properties:
+      RouteTableId: !Ref PublicRouteTableVPCB
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway2
+
+  VPCBSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTableVPCB
+      SubnetId: !Ref VPCBSubnet1
+
+  VPCBSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTableVPCB
+      SubnetId: !Ref VPCBSubnet2
+
+  VPCC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCCCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Ref VPCCName
+
+  InternetGateway3:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCCName} - IGW
+
+  InternetGatewayAttachment3:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway3
+      VpcId: !Ref VPCC
+
+  VPCCSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPCC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref VPCCSubnet1CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCCName} - AZ1
+
+  VPCCSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPCC
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !Ref VPCCSubnet2CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCCName} - AZ2
+
+  VPCCSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPCC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref VPCCSubnet3CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCCName} - AZ1 TGW
+
+  VPCCSubnet4:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPCC
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !Ref VPCCSubnet4CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCCName} - AZ2 TGW
+
+  PublicRouteTableVPCC:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPCC
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCCName} Route Table
+
+  DefaultPublicRoute3:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment3
+    Properties:
+      RouteTableId: !Ref PublicRouteTableVPCC
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway3
+
+  VPCCSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTableVPCC
+      SubnetId: !Ref VPCCSubnet1
+
+  VPCCSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTableVPCC
+      SubnetId: !Ref VPCCSubnet2
+
+###
+
+  InstanceSecurityGroupVPCA:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable ICMP from anywhere
+      VpcId: !Ref VPCA
+      SecurityGroupIngress:
+      - IpProtocol: icmp
+        FromPort: '-1'
+        ToPort: '-1'
+        CidrIp: 0.0.0.0/0
+
+  InstanceSecurityGroupVPCB:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable ICMP from anywhere
+      VpcId: !Ref VPCB
+      SecurityGroupIngress:
+      - IpProtocol: icmp
+        FromPort: '-1'
+        ToPort: '-1'
+        CidrIp: 0.0.0.0/0
+
+  InstanceSecurityGroupVPCC:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable ICMP from anywhere
+      VpcId: !Ref VPCC
+      SecurityGroupIngress:
+      - IpProtocol: icmp
+        FromPort: '-1'
+        ToPort: '-1'
+        CidrIp: 0.0.0.0/0
+
+  Ec2SsmIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [ec2.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+
+  EC2SsmInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles: [!Ref Ec2SsmIamRole]
+
+  EC2InstanceVPCA:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType:
+        Ref: InstanceType
+      SecurityGroupIds:
+      - Ref: InstanceSecurityGroupVPCA
+      SubnetId:
+        Ref: VPCASubnet1
+      ImageId: !Ref LatestAmiId
+      IamInstanceProfile: !Ref EC2SsmInstanceProfile
+      Tags:
+        - Key: Name
+          Value: !Ref InstanceNameVPCA
+
+  EC2InstanceVPCB:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType:
+        Ref: InstanceType
+      SecurityGroupIds:
+      - Ref: InstanceSecurityGroupVPCB
+      SubnetId:
+        Ref: VPCBSubnet1
+      ImageId: !Ref LatestAmiId
+      IamInstanceProfile: !Ref EC2SsmInstanceProfile
+      Tags:
+        - Key: Name
+          Value: !Ref InstanceNameVPCB
+
+  EC2InstanceVPCC:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType:
+        Ref: InstanceType
+      SecurityGroupIds:
+      - Ref: InstanceSecurityGroupVPCC
+      SubnetId:
+        Ref: VPCCSubnet1
+      ImageId: !Ref LatestAmiId
+      IamInstanceProfile: !Ref EC2SsmInstanceProfile
+      Tags:
+        - Key: Name
+          Value: !Ref InstanceNameVPCC
+
+###
+
+  TransitGateway:
+    Type: AWS::EC2::TransitGateway
+    Properties:
+      Description: Immersion Day TGW
+      AmazonSideAsn: 64512
+      AutoAcceptSharedAttachments: enable
+      DefaultRouteTableAssociation: enable
+      DefaultRouteTablePropagation: enable
+      DnsSupport: enable
+      VpnEcmpSupport: enable
+      Tags:
+        - Key: Name
+          Value: TGW
+
+
+  TransitGatewayAttachmentVPCA:
+    Type: AWS::EC2::TransitGatewayAttachment
+    DependsOn: TransitGateway
+    Properties:
+      SubnetIds:
+        - !Ref VPCASubnet3
+        - !Ref VPCASubnet4
+      TransitGatewayId: !Ref TransitGateway
+      VpcId: !Ref VPCA
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCAName} TGW
+
+  TransitGatewayAttachmentVPCB:
+    Type: AWS::EC2::TransitGatewayAttachment
+    DependsOn: TransitGateway
+    Properties:
+      SubnetIds:
+        - !Ref VPCBSubnet3
+        - !Ref VPCBSubnet4
+      TransitGatewayId: !Ref TransitGateway
+      VpcId: !Ref VPCB
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCBName} TGW
+
+  TransitGatewayAttachmentVPCC:
+    Type: AWS::EC2::TransitGatewayAttachment
+    DependsOn: TransitGateway
+    Properties:
+      SubnetIds:
+        - !Ref VPCCSubnet3
+        - !Ref VPCCSubnet4
+      TransitGatewayId: !Ref TransitGateway
+      VpcId: !Ref VPCC
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCCName} TGW
+
+  TransitGatewayRouteVPCA:
+    Type: 'AWS::EC2::Route'
+    DependsOn: TransitGatewayAttachmentVPCA
+    Properties:
+      DestinationCidrBlock: 10.0.0.0/8
+      RouteTableId: !Ref PublicRouteTableVPCA
+      TransitGatewayId: !Ref TransitGateway
+
+  TransitGatewayRouteVPCB:
+    Type: 'AWS::EC2::Route'
+    DependsOn: TransitGatewayAttachmentVPCB
+    Properties:
+      DestinationCidrBlock: 10.0.0.0/8
+      RouteTableId: !Ref PublicRouteTableVPCB
+      TransitGatewayId: !Ref TransitGateway
+
+  TransitGatewayRouteVPCC:
+    Type: 'AWS::EC2::Route'
+    DependsOn: TransitGatewayAttachmentVPCC
+    Properties:
+      DestinationCidrBlock: 10.0.0.0/8
+      RouteTableId: !Ref PublicRouteTableVPCC
+      TransitGatewayId: !Ref TransitGateway
+
+
+Outputs:
+  VPCA:
+    Description: A reference to the created VPCA
+    Value: !Ref VPCA
+
+  VPCASubnets:
+    Description: A list of the public subnets
+    Value: !Join [ ",", [ !Ref VPCASubnet1, !Ref VPCASubnet2 ]]
+
+  VPCB:
+    Description: A reference to the created VPCB
+    Value: !Ref VPCB
+
+  VPCBSubnets:
+    Description: A list of the public subnets
+    Value: !Join [ ",", [ !Ref VPCBSubnet1, !Ref VPCBSubnet2 ]]
+
+  VPCC:
+    Description: A reference to the created VPCC
+    Value: !Ref VPCC
+
+  VPCCSubnets:
+    Description: A list of the public subnets
+    Value: !Join [ ",", [ !Ref VPCCSubnet1, !Ref VPCCSubnet2 ]]
+
+  ###
+
+  InstanceIdVPCA:
+    Description: InstanceId of the newly created EC2 instance in VPC A
+    Value:
+      Ref: EC2InstanceVPCA
+  InstanceIdVPCB:
+    Description: InstanceId of the newly created EC2 instance in VPC B
+    Value:
+      Ref: EC2InstanceVPCB
+  InstanceIdVPCC:
+    Description: InstanceId of the newly created EC2 instance in VPC C
+    Value:
+      Ref: EC2InstanceVPCC

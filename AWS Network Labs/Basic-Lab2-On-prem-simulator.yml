@@ -1,0 +1,467 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "VPC template for simulated on-prem environment. "
+Parameters:
+  VpcCidr:
+    AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Default: 10.10.0.0/16
+    Description: CIDR block for the VPC
+    Type: String
+  PublicSubnet0Cidr:
+    AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Default: 10.10.0.0/24
+    Description: CIDR block for Public subnet
+    Type: String
+  PrivateSubnet0Cidr:
+    AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Default: 10.10.1.0/24
+    Description: CIDR block for Private subnet
+    Type: String
+  InstanceType:
+    AllowedValues:
+    - t2.nano
+    - t2.micro
+    - t2.small
+    - t2.medium
+    - t2.large
+    - t2.xlarge
+    - t2.2xlarge
+    - t3.nano
+    - t3.micro
+    - t3.small
+    - t3.medium
+    - t3.large
+    - t3.xlarge
+    - t3.2xlarge
+    Default: t2.micro
+    Description: Bastion EC2 instance type.
+    Type: String
+  LatestAmiId:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+
+Resources:
+  PrivateSubnet0:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 0
+        - Fn::GetAZs: !Ref 'AWS::Region'
+      CidrBlock: !Ref PrivateSubnet0Cidr
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Join [ '', [ 'OnPremPrivateSubnet-', !Ref 'AWS::StackName' ] ]
+        - Key: SubnetType
+          Value: Private
+      VpcId: !Ref Vpc
+
+  PrivateSubnetRouteTableAssociation0:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref NatRouteTable0
+      SubnetId: !Ref PrivateSubnet0
+
+  PublicSubnet0:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 0
+        - Fn::GetAZs: !Ref 'AWS::Region'
+      CidrBlock: !Ref PublicSubnet0Cidr
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Join [ '', [ 'OnPremPublicSubnet-', !Ref 'AWS::StackName' ] ]
+        - Key: SubnetType
+          Value: Public
+      VpcId: !Ref Vpc
+
+  PublicRouteTableAssociation0:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet0
+      RouteTableId: !Ref PublicRouteTable
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join [ '', [ 'OnPremInternetGateway-', !Ref 'AWS::StackName' ] ]
+  AttachInternetGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref Vpc
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachInternetGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join [ '', [ 'OnPremPublicRouteTable-', !Ref 'AWS::StackName' ] ]
+        - Key: Network
+          Value: Public
+      VpcId: !Ref Vpc
+
+  NatEIP0:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+  NatGateway0:
+    Type: AWS::EC2::NatGateway
+    DependsOn: AttachInternetGateway
+    Properties:
+      AllocationId: !GetAtt NatEIP0.AllocationId
+      SubnetId: !Ref PublicSubnet0
+      Tags:
+        - Key: Name
+          Value: !Join [ '', [ 'OnPremNatGateway-', !Ref 'AWS::StackName' ] ]
+  NatRoute0:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref NatRouteTable0
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway0
+  NatRouteTable0:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join [ '', ['OnPremNatRouteTable-', !Ref 'AWS::StackName' ] ]
+        - Key: Network
+          Value: Private
+      VpcId: !Ref Vpc
+
+  S3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      RouteTableIds:
+        - !Ref NatRouteTable0
+        - !Ref PublicRouteTable
+      VpcId: !Ref Vpc
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Join [ '', [ 'OnPremVpc-', !Ref 'AWS::StackName' ] ]
+
+  AppServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for app server
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: "0.0.0.0/0"
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourceSecurityGroupId: !Ref BastionSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "OnPremAppServerSecurityGroup-${AWS::StackName}"
+      VpcId:
+        !Ref Vpc
+
+  DnsServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for DNS server
+      SecurityGroupIngress:
+        - IpProtocol: udp
+          FromPort: 53
+          ToPort: 53
+          CidrIp: "0.0.0.0/0"
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourceSecurityGroupId: !Ref BastionSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "OnPremDnsServerSecurityGroup-${AWS::StackName}"
+      VpcId:
+        !Ref Vpc
+
+  BastionSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Bastion instances
+      Tags:
+        - Key: Name
+          Value: !Sub "OnPremBastionSecurityGroup-${AWS::StackName}"
+      VpcId:
+        !Ref Vpc
+
+  DhcpOptions:
+    Type: AWS::EC2::DHCPOptions
+    DependsOn: DnsServer
+    Properties:
+      DomainName: "example.corp"
+      DomainNameServers:
+      - !GetAtt DnsServer.PrivateIp
+      Tags:
+        - Key: Name
+          Value: !Sub "DhcpOptions-${AWS::StackName}"
+
+  AttachDhcpOptions:
+    Type: AWS::EC2::VPCDHCPOptionsAssociation
+    Properties:
+      DhcpOptionsId: !Ref DhcpOptions
+      VpcId: !Ref Vpc
+
+  DCServerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join
+        - "-"
+        - - Ref: AWS::StackName
+          - "SSMRole"
+          - Ref: AWS::Region
+      Path: "/"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+
+  DCInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+        - !Ref DCServerRole
+
+  AppServer:
+    Type: AWS::EC2::Instance
+    DependsOn: NatRoute0
+    Properties:
+      ImageId: !Ref LatestAmiId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile:
+        Ref: DCInstanceProfile
+      SecurityGroupIds:
+        - !Ref AppServerSecurityGroup
+      SubnetId: !Ref PrivateSubnet0
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          # install updates
+          yum update -y
+
+          # configure AWS CLI for ec2-user
+          mkdir /home/ec2-user/.aws
+          cat > /home/ec2-user/.aws/config<< EOF
+          [default]
+          region = ${AWS::Region}
+          EOF
+
+          chown -r ec2-user:ec2-user /home/ec2-user/.aws
+
+          # set up web server
+          yum install -y httpd
+          echo "Hello, world." > /var/www/html/index.html
+          systemctl enable httpd.service
+          systemctl start httpd.service
+      Tags:
+        - Key: Name
+          Value: !Join [ '', [ 'OnPremAppServer-', !Ref 'AWS::StackName' ] ]
+
+  DnsServer:
+    Type: AWS::EC2::Instance
+    DependsOn: AppServer
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: "PT30M"
+    Properties:
+      ImageId: !Ref LatestAmiId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile:
+        Ref: DCInstanceProfile
+      SecurityGroupIds:
+        - !Ref DnsServerSecurityGroup
+      SubnetId: !Ref PrivateSubnet0
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          # install updates
+          yum update -y
+
+          # configure AWS CLI for ec2-user
+          mkdir /home/ec2-user/.aws
+          cat > /home/ec2-user/.aws/config<< EOF
+          [default]
+          region = ${AWS::Region}
+          EOF
+
+          chown -r ec2-user:ec2-user /home/ec2-user/.aws
+
+          # set up DNS server
+          yum install -y bind
+
+          # replace named.conf
+          cat > /etc/named.conf<< EOF
+          options {
+            directory       "/var/named";
+            dump-file       "/var/named/data/cache_dump.db";
+            statistics-file "/var/named/data/named_stats.txt";
+            memstatistics-file "/var/named/data/named_mem_stats.txt";
+            recursing-file  "/var/named/data/named.recursing";
+            secroots-file   "/var/named/data/named.secroots";
+
+            recursion yes;
+
+            allow-query { any; };
+
+            dnssec-enable no;
+            dnssec-validation no;
+
+            bindkeys-file "/etc/named.root.key";
+
+            managed-keys-directory "/var/named/dynamic";
+
+            pid-file "/run/named/named.pid";
+            session-keyfile "/run/named/session.key";
+
+            forwarders {
+                    169.254.169.253;
+            };
+            forward first;
+          };
+
+          logging {
+            channel default_debug {
+                  file "data/named.run";
+                  severity dynamic;
+            };
+          };
+
+
+          zone "." IN {
+                  type hint;
+                  file "named.ca";
+          };
+
+          zone "example.corp" IN {
+                  type master;
+                  file "/etc/named/example.corp";
+                  allow-update { none; };
+          };
+
+          include "/etc/named.rfc1912.zones";
+          include "/etc/named.root.key";
+
+          EOF
+
+          # build zone file with my IP address and AppSercer IP.
+          ORIGIN='$ORIGIN'
+          APPIP='${AppServer.PrivateIp}'
+          MYIP=$( curl -s http://169.254.169.254/latest/meta-data/local-ipv4 )
+
+          cat > /etc/named/example.corp<< EOF
+          $ORIGIN example.corp.
+          @                      3600 SOA   ns.example.corp. (
+                                        zone-admin.example.com.     ; address of responsible party
+                                        2020050701                 ; serial number
+                                        3600                       ; refresh period
+                                        600                        ; retry period
+                                        604800                     ; expire time
+                                        1800                     ) ; minimum ttl
+                                86400 NS    ns1.example.corp.
+          myapp                    60 IN A  $APPIP
+          ns1                      60 IN A  $MYIP
+          EOF
+
+          # activate DNS server
+          systemctl enable named.service
+          systemctl start named.service
+
+          # set up as local DNS resolver
+          cat > /etc/resolv.conf<< EOF
+          search example.corp
+          nameserver $MYIP
+          EOF
+
+          # signal CFN that we are ready. We want our DNS server to be up before launching the next instance.
+          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource DnsServer --region ${AWS::Region}
+
+      Tags:
+        - Key: Name
+          Value: !Join [ '', [ 'OnPremDnsServer-', !Ref 'AWS::StackName' ] ]
+
+  BastionHost:
+    Type: AWS::EC2::Instance
+    DependsOn:
+    - PublicRoute
+    - AttachDhcpOptions
+    Properties:
+      ImageId: !Ref LatestAmiId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile:
+        Ref: DCInstanceProfile
+      SecurityGroupIds:
+        - !Ref BastionSecurityGroup
+      SubnetId: !Ref PublicSubnet0
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          # install updates
+          yum update -y
+
+          # install OpenSWNA
+          yum install -y openswan
+
+          # configure AWS CLI for ec2-user
+          mkdir /home/ec2-user/.aws
+          cat > /home/ec2-user/.aws/config<< EOF
+          [default]
+          region = ${AWS::Region}
+          EOF
+
+          chown -r ec2-user:ec2-user /home/ec2-user/.aws
+      Tags:
+        - Key: Name
+          Value: !Join [ '', [ 'OnPremBastion-', !Ref 'AWS::StackName' ] ]
+
+Outputs:
+
+  Vpc:
+    Value: !Ref Vpc
+  VpcCidr:
+    Value: !Ref VpcCidr
+  PublicSubnet0:
+    Value: !Ref PublicSubnet0
+  PrivateSubnet0:
+    Value: !Ref PrivateSubnet0
+  BastionSecurityGroup:
+    Value: !Ref BastionSecurityGroup
+  PublicIp:
+    Value: !GetAtt BastionHost.PublicIp
+  AppServerPrivateIp:
+    Value: !GetAtt AppServer.PrivateIp
+  DnsServerPrivateIp:
+    Value: !GetAtt DnsServer.PrivateIp
