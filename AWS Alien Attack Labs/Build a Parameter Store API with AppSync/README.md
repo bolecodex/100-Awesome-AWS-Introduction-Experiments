@@ -116,4 +116,4 @@ query MyQuery {
     }
 }
 
-curl -H "content-Type:application/graphql" -H "<API-KEY>" -X POST -d '{ "query": "query MyQuery { getSystemSettings( systemName : \"system10\" ) { Parameters { Name Value } SystemName } }" }' <API-URL>
+curl -H "content-Type:application/graphql" -H "x-api-key:<API-KEY>" -X POST -d '{ "query": "query MyQuery { getSystemSettings( systemName : \"system10\" ) { Parameters { Name Value } SystemName } }" }' <API-URL>
