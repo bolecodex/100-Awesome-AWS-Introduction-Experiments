@@ -1,0 +1,17 @@
+# Payload
+{
+    "User" : "theuser@amazon.com",
+    "Client" : "13522bac-89fb-4f14-ac37-92642eec2b06",
+    "Timestamp" : "2021-02-01T18:42:35.903Z",
+    "Order" : {
+        "Symbol" : "USDJPY",
+        "Volume" : 200000,
+        "Price" : 104.987
+    }
+}
+
+# Response
+{
+  "statusCode": 200,
+  "body": "we received {\"User\":\"theuser@amazon.com\",\"Client\":\"13522bac-89fb-4f14-ac37-92642eec2b06\",\"Timestamp\":\"2021-02-01T18:42:35.903Z\",\"Order\":{\"Symbol\":\"USDJPY\",\"Volume\":200000,\"Price\":104.987}}"
+}
