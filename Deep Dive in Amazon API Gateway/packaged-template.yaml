@@ -1,0 +1,20 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'SAM template for Serverless framework service: '
+Resources:
+  CalculateCostPerUnit:
+    Properties:
+      CodeUri: s3://serversless-immersion-api-gateway/a0dd3aca487ebd387f8ee70b6bc99382
+      Handler: com.serverless.CostCalculator
+      MemorySize: 128
+      Runtime: java8
+      Timeout: 15
+    Type: AWS::Serverless::Function
+  MedianPriceCalculator:
+    Properties:
+      CodeUri: s3://serversless-immersion-api-gateway/aa251f27b8bcf5de00dca96c8de879cf
+      Handler: com.serverless.MedianPriceCalculator
+      MemorySize: 128
+      Runtime: java8
+      Timeout: 15
+    Type: AWS::Serverless::Function
+Transform: AWS::Serverless-2016-10-31
