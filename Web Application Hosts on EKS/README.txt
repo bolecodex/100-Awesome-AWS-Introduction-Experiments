@@ -10,13 +10,14 @@ curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/d
 sudo mv /tmp/eksctl /usr/local/bin
 eksctl version
 
-#Install Terraform to provision the VPC network architecture
+# Install Terraform
+# https://www.terraform.io/downloads
 sudo yum install -y yum-utils
 sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
 sudo yum install terraform -y
 terraform --version
 
-#Install the JSON praser jq command on your Cloud9 environment.
+# Install the JSON praser jq command on your Cloud9 environment.
 sudo yum install -y jq
 jq
 
@@ -59,6 +60,11 @@ PRIVATE_SUBNETS_ID_C=$PRIVATE_SUBNETS_ID_C, \
 PUBLIC_SUBNETS_ID_A=$PUBLIC_SUBNETS_ID_A, \
 PUBLIC_SUBNETS_ID_B=$PUBLIC_SUBNETS_ID_B, \
 PUBLIC_SUBNETS_ID_C=$PUBLIC_SUBNETS_ID_C"
+
+
+# Create an EKS cluster configuration file
+ssh-keygen
+eksctl create cluster -f /home/ec2-user/environment/eks-cluster.yaml
 
 # Grab the kube config file
 mkdir ~/.kube
