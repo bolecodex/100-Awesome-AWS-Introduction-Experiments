@@ -190,6 +190,18 @@ k8s-at-home/kube-ops-view \
 --set rbac.create=True
 helm list
 
+# Cleanup
+cd ~/environment/manifests/
+kubectl delete -f ingress.yaml
+eksctl delete cluster --name=eks-demo
+aws ecr describe-repositories
+aws ecr delete-repository --repository-name demo-flask-backend --force
+aws ecr delete-repository --repository-name demo-frontend --force
+aws logs describe-log-groups --query 'logGroups[*].logGroupName' --output table | \
+awk '{print $2}' | grep ^/aws/containerinsights/eks-demo | while read x; do  echo "deleting $x" ; aws logs delete-log-group --log-group-name $x; done
+aws logs describe-log-groups --query 'logGroups[*].logGroupName' --output table | \
+awk '{print $2}' | grep ^/aws/eks/eks-demo | while read x; do  echo "deleting $x" ; aws logs delete-log-group --log-group-name $x; done
+
 
 
 
