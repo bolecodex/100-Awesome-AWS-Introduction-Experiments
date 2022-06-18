@@ -1,0 +1,165 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+
+  "Description" : "AWS CloudFormation template for AWS IoT Device Client workshop. Creates various resources like Cloud9, S3, VPC and more.",
+
+  "Mappings" : {
+    "CONFIG" : {
+        "DEPLOYMENT": { "VERSION" : "2021-05-27" },
+        "S3BUCKET": { "NAME": "aws-iot-workshop-artifacts" },
+        "S3PREFIX": { "NAME": "resources" }
+    }
+  },
+
+  "Metadata" : {
+    "AWS::CloudFormation::Interface" : {
+      "ParameterGroups" : [
+        {
+          "Label" : { "default": "Instance types" },
+          "Parameters" : [ "C9InstanceType", "EC2InstanceType" ]
+        }
+      ],
+      "ParameterLabels" : {
+        "C9InstanceType" : { "default" : "AWS Cloud9 Instance Type: " },
+        "EC2InstanceType" : { "default" : "Amazon EC2 Instance Type: " }
+      }
+    }
+  },
+
+  "Parameters" : {
+    "C9InstanceType" : {
+      "Description" : "AWS Cloud9 Instance Type",
+      "Type" : "String",
+      "Default" : "t3.medium",
+      "AllowedValues" : [ "t3.medium", "t3.large", "t3.xlarge" ],
+      "ConstraintDescription" : "Must be a valid AWS Cloud9 instance type"
+    },
+    "EC2InstanceType" : {
+      "Description" : "Amazon EC2‚ Instance Type",
+      "Type" : "String",
+      "Default" : "t3.micro",
+      "AllowedValues" : [ "t2.micro", "t3.micro", "t3.small", "t3.medium", "t3.large" ],
+      "ConstraintDescription" : "Must be a valid EC2 instance type"
+    }
+  },
+
+
+  "Resources" : {
+
+    "C9SecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "VpcId" : { "Fn::GetAtt" : [ "MiscResources", "Outputs.VpcId" ] },
+        "GroupDescription" : "Enable access to MQTT port",
+        "Tags" : [ { "Key" : "Name", "Value" : "C9 IoT workshop" } ],
+        "SecurityGroupIngress" : [
+          {"IpProtocol" : "tcp", "FromPort" : 8883, "ToPort" : 8883, "CidrIp" : "127.0.0.0/8"}
+        ]
+      }
+    },
+
+    "MiscResources" : {
+      "Type" : "AWS::CloudFormation::Stack",
+      "Properties" : {
+        "TemplateURL" : {
+           "Fn::Sub": [
+              "https://${S3Bucket}.s3.amazonaws.com/${S3Prefix}/${Version}/cfn/cfn-iot-misc.json",
+               {
+                 "S3Bucket": { "Fn::FindInMap" : [ "CONFIG", "S3BUCKET", "NAME"] },
+                 "S3Prefix": { "Fn::FindInMap" : [ "CONFIG", "S3PREFIX", "NAME"] },
+                 "Version": { "Fn::FindInMap" : [ "CONFIG", "DEPLOYMENT", "VERSION"] }
+               }
+           ]
+        }
+      }
+    },
+
+    "C9Instance" : {
+      "Type" : "AWS::CloudFormation::Stack",
+      "Properties" : {
+        "TemplateURL" : {
+           "Fn::Sub": [
+              "https://${S3Bucket}.s3.amazonaws.com/${S3Prefix}/${Version}/cfn/cfn-iot-c9-v2.json",
+               {
+                 "S3Bucket": { "Fn::FindInMap" : [ "CONFIG", "S3BUCKET", "NAME"] },
+                 "S3Prefix": { "Fn::FindInMap" : [ "CONFIG", "S3PREFIX", "NAME"] },
+                 "Version": { "Fn::FindInMap" : [ "CONFIG", "DEPLOYMENT", "VERSION"] }
+               }
+           ]
+        },
+        "Parameters" : {
+          "C9InstanceType": { "Ref": "C9InstanceType" },
+          "C9ImageId": "ubuntu-18.04-x86_64",
+          "C9SecurityGroupId": { "Ref": "C9SecurityGroup" },
+          "C9StopTime": 180,
+          "IoTPolicy": { "Fn::GetAtt" : [ "MiscResources", "Outputs.IoTPolicy" ] },
+          "IoTServiceRoleArn": { "Fn::GetAtt" : [ "MiscResources", "Outputs.IoTServiceRoleArn" ] },
+          "RootStackName": { "Ref": "AWS::StackName" },
+          "SubnetId": { "Fn::GetAtt" : [ "MiscResources", "Outputs.PubSubnetIdA" ] },
+          "S3BucketArn": { "Fn::GetAtt" : [ "MiscResources", "Outputs.S3BucketArn" ] },
+          "S3BucketName": { "Fn::GetAtt" : [ "MiscResources", "Outputs.S3BucketName" ] },
+          "Workshop": "AwsWorkshop/IoT/DeviceClient",
+          "UserDataScript": "c9-ub1804-device-client-user-data.sh"
+        }
+      }
+    },
+
+    "EC2TunnelInstance" : {
+      "Type" : "AWS::CloudFormation::Stack",
+      "Properties" : {
+        "TemplateURL" :  {
+           "Fn::Sub": [
+              "https://${S3Bucket}.s3.amazonaws.com/${S3Prefix}/${Version}/cfn/cfn-iot-ec2.json",
+               {
+                 "S3Bucket": { "Fn::FindInMap" : [ "CONFIG", "S3BUCKET", "NAME"] },
+                 "S3Prefix": { "Fn::FindInMap" : [ "CONFIG", "S3PREFIX", "NAME"] },
+                 "Version": { "Fn::FindInMap" : [ "CONFIG", "DEPLOYMENT", "VERSION"] }
+               }
+           ]
+        },
+        "Parameters" : {
+          "EC2InstanceType" : { "Ref": "EC2InstanceType" },
+          "VpcId" : { "Fn::GetAtt" : [ "MiscResources", "Outputs.VpcId" ] },
+          "SubnetId": { "Fn::GetAtt" : [ "MiscResources", "Outputs.PubSubnetIdA" ] },
+          "S3Bucket": { "Fn::GetAtt" : [ "MiscResources", "Outputs.S3BucketName" ] },
+          "UserDataScript": "sec-tunnel-user-data.sh"
+        }
+      }
+    }
+  },
+
+  "Outputs" : {
+    "AWSCloud9URL": {
+      "Description": "URL to access your AWS Cloud9 IDE",
+      "Value": { "Fn::GetAtt" : [ "C9Instance", "Outputs.AWSCloud9URL" ] }
+    },
+    "AWSCloud9Id": {
+      "Description": "Environment Id of your AWS Cloud9 IDE",
+      "Value": { "Fn::GetAtt" : [ "C9Instance", "Outputs.AWSCloud9Id" ] }
+    },
+    "AmazonEC2DnsName" : {
+      "Description": "DNS name of the EC2 tunnel instance",
+      "Value" : { "Fn::GetAtt" : [ "EC2TunnelInstance", "Outputs.EC2DnsName" ] }
+    },
+    "S3Bucket" : {
+      "Description" : "Name of the S3 Bucket for the IoT workshop",
+      "Value" : { "Fn::GetAtt" : [ "MiscResources", "Outputs.S3BucketName" ] }
+    },
+    "IoTPolicy" : {
+      "Description" : "Name of the IoT policy for JITP",
+      "Value" : { "Fn::GetAtt" : [ "MiscResources", "Outputs.IoTPolicy" ] }
+    },
+    "IoTServiceRoleArn" : {
+      "Description" : "Role Arn for IoT device provisiong",
+      "Value" : { "Fn::GetAtt" : [ "MiscResources", "Outputs.IoTServiceRoleArn" ] }
+    },
+    "IoTServiceRoleName" : {
+      "Description" : "Role name for IoT device provisiong/rule actions",
+      "Value" : { "Fn::GetAtt" : [ "MiscResources", "Outputs.IoTServiceRoleName" ] }
+    },
+    "GGOtaS3UrlSignerRoleArn" : {
+      "Description" : "The IAM role arn for OTA which is used to presign the S3 url which links to the Greengrass software update.",
+      "Value" : { "Fn::GetAtt" : [ "MiscResources", "Outputs.GGOtaS3UrlSignerRoleArn" ] }
+    }
+  }
+}

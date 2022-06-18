@@ -1,0 +1,35 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: "backend-ingress"
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /contents
+            pathType: Prefix
+            backend:
+              service:
+                name: "demo-flask-backend"
+                port:
+                  number: 8080
+          - path: /services
+            pathType: Prefix
+            backend:  
+              service:
+                name: "demo-nodejs-backend"
+                port:
+                  number: 8080
+          # - path: /
+          #   pathType: Prefix
+          #   backend:
+          #     service:
+          #       name: "demo-frontend"
+          #       port:
+          #         number: 80

@@ -1,0 +1,12 @@
+---
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: eks-demo
+  region: ${AWS_REGION}
+fargateProfiles:
+  - name: frontend-fargate-profile
+    selectors:
+      - namespace: default
+        labels:
+          app: frontend-fargate
