@@ -1,0 +1,21 @@
+{
+    "name": "iotlab",
+    "version": "1.0.0",
+    "description": "IoT Device Simulator",
+    "main": "simulator.js",
+    "scripts": {
+      "start": "node simulator.js"
+    },
+    "keywords": [
+      "iot",
+      "aws",
+      "device",
+      "simulator"
+    ],
+    "author": "Jeremy Wallace <jeremygw@amazon.com> (https://github.com/awslabs)",
+    "license": "Apache-2.0",
+    "dependencies": {
+      "aws-iot-device-sdk": "^2.2.6",
+      "colors": "^1.4.0"
+    }
+  }

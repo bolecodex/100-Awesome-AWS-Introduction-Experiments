@@ -1,12 +1,13 @@
 package com.myorg;
 
 import software.constructs.Construct;
-import software.amazon.awscdk.Duration;
 import software.amazon.awscdk.Stack;
 import software.amazon.awscdk.StackProps;
-import software.amazon.awscdk.services.sns.Topic;
-import software.amazon.awscdk.services.sns.subscriptions.SqsSubscription;
-import software.amazon.awscdk.services.sqs.Queue;
+
+import software.amazon.awscdk.services.apigateway.LambdaRestApi;
+import software.amazon.awscdk.services.lambda.Code;
+import software.amazon.awscdk.services.lambda.Function;
+import software.amazon.awscdk.services.lambda.Runtime;
 
 public class CdkWorkshopStack extends Stack {
     public CdkWorkshopStack(final Construct parent, final String id) {
@@ -16,14 +17,16 @@ public class CdkWorkshopStack extends Stack {
     public CdkWorkshopStack(final Construct parent, final String id, final StackProps props) {
         super(parent, id, props);
 
-        final Queue queue = Queue.Builder.create(this, "CdkWorkshopQueue")
-                .visibilityTimeout(Duration.seconds(300))
-                .build();
-
-        final Topic topic = Topic.Builder.create(this, "CdkWorkshopTopic")
-            .displayName("My First Topic Yeah")
+        // Defines a new lambda resource
+        final Function hello = Function.Builder.create(this, "HelloHandler")
+            .runtime(Runtime.NODEJS_14_X)    // execution environment
+            .code(Code.fromAsset("lambda"))  // code loaded from the "lambda" directory
+            .handler("hello.handler")        // file is "hello", function is "handler"
             .build();
 
-        topic.addSubscription(new SqsSubscription(queue));
+        // Defines an API Gateway REST API resource backed by our "hello" function
+        LambdaRestApi.Builder.create(this, "Endpoint")
+            .handler(hello)
+            .build();
     }
 }

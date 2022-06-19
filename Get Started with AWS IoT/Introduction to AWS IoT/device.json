@@ -1,0 +1,15 @@
+{
+    "app": {
+      "publishInterval": 1000,
+      "delta": 0.75,
+      "statusInterval": 5000
+    },
+    "certs": {
+      "caPath": "certs/root.pem",
+      "certPath": "certs/certificate.pem",
+      "keyPath": "certs/private.key"
+    },
+    "host": "a21xv4x9l41lhy-ats.iot.us-west-2.amazonaws.com",
+    "thing": "Thermostat",
+    "topic": "house"
+  }
