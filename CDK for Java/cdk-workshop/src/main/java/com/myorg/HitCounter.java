@@ -29,7 +29,7 @@ public class HitCounter extends Construct {
                 .build())
             .build();
         
-        // 为创建上面的handler准备环境变量
+        // 为创建上面的handler准备环境变量, Map<String, String>为泛型，在这里将数据类型String作为参数传进去
         final Map<String, String> environment = new HashMap<>();
         environment.put("DOWNSTREAM_FUNCTION_NAME", props.getDownstream().getFunctionName());
         environment.put("HITS_TABLE_NAME", this.table.getTableName());
@@ -43,6 +43,9 @@ public class HitCounter extends Construct {
 
         // Grants the lambda function read/write permissions to our table
         this.table.grantReadWriteData(this.handler);
+        
+        // Grants the lambda function invoke permissions to the downstream function
+        props.getDownstream().grantInvoke(this.handler);
     }
 
     // 提供获取handler和table的方法

@@ -1,5 +1,7 @@
 package com.myorg;
 
+import io.github.cdklabs.dynamotableviewer.TableViewer;
+
 import software.constructs.Construct;
 import software.amazon.awscdk.Stack;
 import software.amazon.awscdk.StackProps;
@@ -18,15 +20,29 @@ public class CdkWorkshopStack extends Stack {
         super(parent, id, props);
 
         // Defines a new lambda resource
+        // 链式调用，Builder是Function的内部类
         final Function hello = Function.Builder.create(this, "HelloHandler")
             .runtime(Runtime.NODEJS_14_X)    // execution environment
             .code(Code.fromAsset("lambda"))  // code loaded from the "lambda" directory
             .handler("hello.handler")        // file is "hello", function is "handler"
             .build();
 
+        // Defines our hitcounter resource
+        final HitCounter helloWithCounter = new HitCounter(this, "HelloHitCounter", HitCounterProps.builder()
+            .downstream(hello)
+            .build());
+
         // Defines an API Gateway REST API resource backed by our "hello" function
+        // https://docs.aws.amazon.com/cdk/api/v1/docs/@aws-cdk_aws-apigateway.LambdaRestApi.html
         LambdaRestApi.Builder.create(this, "Endpoint")
-            .handler(hello)
+            .handler(helloWithCounter.getHandler())
+            .build();
+
+        // Defines a viewer for the HitCounts table
+        TableViewer.Builder.create(this, "ViewerHitCount")
+            .title("Hello Hits")
+            .table(helloWithCounter.getTable())
+            .sortBy("-hits")
             .build();
     }
 }
