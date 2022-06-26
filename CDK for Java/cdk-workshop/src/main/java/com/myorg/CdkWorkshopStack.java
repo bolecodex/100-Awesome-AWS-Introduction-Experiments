@@ -27,7 +27,7 @@ public class CdkWorkshopStack extends Stack {
             .handler("hello.handler")        // file is "hello", function is "handler"
             .build();
 
-        // Defines our hitcounter resource
+        // 定义hitcounter资源
         final HitCounter helloWithCounter = new HitCounter(this, "HelloHitCounter", HitCounterProps.builder()
             .downstream(hello)
             .build());
@@ -39,6 +39,7 @@ public class CdkWorkshopStack extends Stack {
             .build();
 
         // Defines a viewer for the HitCounts table
+        // 定义DynamoDB的TableViewer，用来显示Table内容
         TableViewer.Builder.create(this, "ViewerHitCount")
             .title("Hello Hits")
             .table(helloWithCounter.getTable())

@@ -8,6 +8,7 @@ public final class CdkWorkshopApp {
 
         new CdkWorkshopStack(app, "CdkWorkshopStack");
 
+        // 构建Cloudformation模版
         app.synth();
     }
 }

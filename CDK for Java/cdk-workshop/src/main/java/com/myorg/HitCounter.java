@@ -18,10 +18,17 @@ public class HitCounter extends Construct {
     private final Function handler;
     private final Table table;
 
+    /**
+     * HitCounter的构造函数，通过将参数传递给Construct基类，
+     * @param scope Construct类型
+     * @param id 
+     * @param props
+     */
     public HitCounter(final Construct scope, final String id, final HitCounterProps props) {
         // 调用父类Construct的构造函数
         super(scope, id);
-        // 使用Table内部自定义的Builder来创建Table实例
+
+        // 使用Table内部自定义的Builder来创建DynamoDB Table实例，path作为分区键
         this.table = Table.Builder.create(this, "Hits")
             .partitionKey(Attribute.builder()
                 .name("path")
@@ -34,6 +41,8 @@ public class HitCounter extends Construct {
         environment.put("DOWNSTREAM_FUNCTION_NAME", props.getDownstream().getFunctionName());
         environment.put("HITS_TABLE_NAME", this.table.getTableName());
 
+        // 创建Lambda函数HitCounterHandler
+        // DOWNSTREAM_FUNCTION_NAME和HITS_TABLE_NAME通过环境变量后期绑定，在实际stack进行deploy时才被绑定值
         this.handler = Function.Builder.create(this, "HitCounterHandler")
             .runtime(Runtime.NODEJS_14_X)
             .handler("hitcounter.handler")
