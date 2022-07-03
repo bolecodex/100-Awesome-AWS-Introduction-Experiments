@@ -8,6 +8,7 @@ import software.amazon.awscdk.services.lambda.IFunction;
 public interface HitCounterProps {
     
     // Public constructor for the props builder 获取HitCounterProps的构造器Builder
+    // Builder是HitCounterProps接口中自定义的内部类
     public static Builder builder() {
         return new Builder();
     }
