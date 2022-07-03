@@ -1,3 +1,5 @@
+// If you're using the standard AWS CDK development template, 
+// your stacks are instantiated in the same file where you instantiate the App object.
 package com.myorg;
 
 import software.amazon.awscdk.App;

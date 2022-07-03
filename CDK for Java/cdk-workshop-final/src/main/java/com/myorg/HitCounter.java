@@ -8,6 +8,8 @@ import software.constructs.Construct;
 import software.amazon.awscdk.services.dynamodb.Attribute;
 import software.amazon.awscdk.services.dynamodb.AttributeType;
 import software.amazon.awscdk.services.dynamodb.Table;
+import software.amazon.awscdk.services.dynamodb.TableEncryption;
+
 import software.amazon.awscdk.services.lambda.Code;
 import software.amazon.awscdk.services.lambda.Function;
 import software.amazon.awscdk.services.lambda.Runtime;
@@ -24,9 +26,25 @@ public class HitCounter extends Construct {
      * @param id 
      * @param props
      */
-    public HitCounter(final Construct scope, final String id, final HitCounterProps props) {
+    // RuntimeException is the superclass of those exceptions that can be thrown during the normal operation of the Java Virtual Machine.
+    public HitCounter(final Construct scope, final String id, final HitCounterProps props) throws RuntimeException {
         // 调用父类Construct的构造函数
         super(scope, id);
+
+        if (props.getReadCapacity() != null) {
+            if (props.getReadCapacity().intValue() < 5 || props.getReadCapacity().intValue() > 20) {
+                throw new RuntimeException("readCapacity must be greater than 5 or less than 20");
+            }
+        }
+
+        // Number readCapacity;
+        // if(props.getReadCapacity() == null){
+        //     readCapacity = 5;
+        // }else{
+        //     readCapacity = props.getReadCapacity();
+        // }
+        // 三目运算符，等价于上面的注释
+        Number readCapacity = (props.getReadCapacity() == null) ? 5 : props.getReadCapacity();
 
         // 使用Table内部自定义的Builder来创建DynamoDB Table实例，path作为分区键
         this.table = Table.Builder.create(this, "Hits")
@@ -34,6 +52,8 @@ public class HitCounter extends Construct {
                 .name("path")
                 .type(AttributeType.STRING)
                 .build())
+            .encryption(TableEncryption.AWS_MANAGED)
+            .readCapacity(readCapacity)
             .build();
         
         // 为创建上面的handler准备环境变量, Map<String, String>为泛型，在这里将数据类型String作为参数传进去
