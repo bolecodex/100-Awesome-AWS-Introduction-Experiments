@@ -11,6 +11,7 @@ import software.amazon.awscdk.services.lambda.Runtime;
 
 import java.util.Map;
 
+// Assertions is a collection of utility methods that support asserting conditions in tests.
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -120,7 +121,14 @@ public class HitCounterTest {
             .handler("hello.handler")
             .build();
 
-        //？？？
+
+        // assertThrows预期这里会抛出一个RuntimeException的异常，如果正确抛出，则测试通过
+        // 如果没有引发RuntimeException异常，或者引发了其他类型的异常，则测试失败。
+        // assertThrows后面跟Lambda表达式是标准写法
+        // https://blog.csdn.net/qq_44336097/article/details/116005808
+        // “() -> {}”是Java Lambda表达式：Lambda 允许把函数作为一个方法的参数（函数作为参数传递进方法中）。
+        // (parameters) ->{ statements; }，我们这里没有接收参数
+        // RuntimeException.class告知应该要传入异常的类型
         assertThrows(RuntimeException.class, () -> {
             new HitCounter(stack, "HelloHitCounter", HitCounterProps.builder()
                 .downstream(hello)

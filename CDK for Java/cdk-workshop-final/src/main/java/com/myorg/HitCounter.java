@@ -27,6 +27,7 @@ public class HitCounter extends Construct {
      * @param props
      */
     // RuntimeException is the superclass of those exceptions that can be thrown during the normal operation of the Java Virtual Machine.
+    //
     public HitCounter(final Construct scope, final String id, final HitCounterProps props) throws RuntimeException {
         // 调用父类Construct的构造函数
         super(scope, id);
