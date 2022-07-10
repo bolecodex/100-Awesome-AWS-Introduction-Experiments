@@ -7,8 +7,8 @@ public final class CdkWorkshopApp {
         App app = new App();
 
         // Entry point to deploy our application stack
-        // new WorkshopPipelineStack(app, "PipelineStack");
-        new CdkWorkshopStack(app, "CdkWorkshopStack");
+        new WorkshopPipelineStack(app, "PipelineStack");
+
 
         // 构建Cloudformation模版
         app.synth();

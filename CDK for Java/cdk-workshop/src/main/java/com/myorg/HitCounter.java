@@ -34,7 +34,12 @@ public class HitCounter extends Construct{
         .runtime(Runtime.NODEJS_14_X)
         .handler("hitconter.handler")
         .code(Code.fromAsset("lambda"))
+        .environment(environment)
         .build();
+
+        this.table.grantReadWriteData(this.handler);
+
+        props.getDownstream().grantInvoke(this.handler);
 
     }
     public Table getTable(){
