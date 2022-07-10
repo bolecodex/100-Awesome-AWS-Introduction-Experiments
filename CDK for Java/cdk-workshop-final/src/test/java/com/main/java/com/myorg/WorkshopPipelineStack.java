@@ -40,10 +40,10 @@ public class WorkshopPipelineStack extends Stack {
                         "npm install -g aws-cdk"   // Commands to run before build
                 ))
                 .commands(List.of(
-                        "mvn clean package",            // Language-specific build commands
-                        "npx cdk synth"           // Synth command (always same)
+                        "mvn clean package",       // Language-specific build commands
+                        "npx cdk synth"            // Synth command (always same)
                 )).build())
-            .build();
+        .build();
 
         // Import and create an instance of the WorkshopPipelineStage
         final WorkshopPipelineStage deploy = new WorkshopPipelineStage(this, "Deploy");
