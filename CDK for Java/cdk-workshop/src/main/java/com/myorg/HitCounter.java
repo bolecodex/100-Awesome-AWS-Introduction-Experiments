@@ -7,6 +7,7 @@ import software.constructs.Construct;
 import software.amazon.awscdk.services.dynamodb.Table;
 import software.amazon.awscdk.services.dynamodb.Attribute;
 import software.amazon.awscdk.services.dynamodb.AttributeType;
+import software.amazon.awscdk.services.dynamodb.TableEncryption;
 
 import software.amazon.awscdk.services.lambda.Function;
 import software.amazon.awscdk.services.lambda.Runtime;
@@ -20,6 +21,7 @@ public class HitCounter extends Construct{
         super(scope, id);
 
         this.table = Table.Builder.create(this, "Hits")
+        .encryption(TableEncryption.AWS_MANAGED)
         .partitionKey(Attribute.builder()
             .name("path")
             .type(AttributeType.STRING)
@@ -27,12 +29,13 @@ public class HitCounter extends Construct{
         .build();
 
         final Map<String, String> environment = new HashMap<>();
-        environment.put("HITS_TABLE_NAME", this.table.getTableName());
+        
         environment.put("DOWNSTREAM_FUNCTION_NAME", props.getDownstream().getFunctionName());
-
-        this.handler = Function.Builder.create(this, "HitConterHandler")
+        environment.put("HITS_TABLE_NAME", this.table.getTableName());
+        
+        this.handler = Function.Builder.create(this, "HitCounterHandler")
         .runtime(Runtime.NODEJS_14_X)
-        .handler("hitconter.handler")
+        .handler("hitcounter.handler")
         .code(Code.fromAsset("lambda"))
         .environment(environment)
         .build();

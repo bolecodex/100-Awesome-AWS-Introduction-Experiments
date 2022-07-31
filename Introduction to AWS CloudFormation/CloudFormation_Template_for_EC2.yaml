@@ -1,0 +1,128 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: CloudFormation template which builds a VPC and one EC2 Instance
+
+Parameters:
+
+  VPCCIDR:
+    Description: CIDR Block for VPC
+    Type: String
+    Default: 10.0.0.0/16
+    AllowedValues:
+      - 10.0.0.0/16
+
+  PublicSubnetParam:
+    Description: Public Subnet
+    Type: String
+    Default: 10.0.0.0/24
+    AllowedValues:
+      - 10.0.0.0/24
+
+  AmazonLinuxAMIID:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+
+Resources:
+
+  VPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: !Ref VPCCIDR
+      EnableDnsSupport: True
+      EnableDnsHostnames: True
+      Tags:
+        - Key: Name
+          Value: LabVPC
+
+  PublicSubnet:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PublicSubnetParam
+      MapPublicIpOnLaunch: True
+      AvailabilityZone: !Select
+        - '0'
+        - !GetAZs ''
+      Tags:
+        - Key: Name
+          Value: LabPublicSubnet
+
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties:
+      Tags:
+        - Key: Name
+          Value: LabInternetGateway
+
+  AttachGateway:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: PublicRouteTable
+
+  PublicRoute:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  LabInstanceSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    DependsOn: VPC
+    Properties:
+      GroupDescription: Security Group allowing HTTP traffic for lab instances
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: LabInstanceSecurityGroup
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+  
+###########
+# EC2 instance creation and installs a simple web application
+###########
+
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AmazonLinuxAMIID
+      InstanceType: 't2.micro'
+      SubnetId: !Ref PublicSubnet
+      SecurityGroupIds:
+        - !Ref LabInstanceSecurityGroup
+      UserData: !Base64 |
+        #!/bin/bash -ex
+        sudo yum update -y
+        sudo yum install -y httpd php
+        sudo service httpd start
+        sudo systemctl enable httpd.service
+        cd /var/www/html
+        wget https://us-west-2-tcprod.s3.amazonaws.com/courses/ILT-TF-200-ARCHIT/v7.1.9/lab-1-EC2/scripts/instanceDdata.zip
+        unzip instanceDdata.zip
+      Tags:
+        - Key: Name
+          Value: Instance
+
+Outputs:
+
+  InstancePublicDNS:
+    Description: 'Public DNS value for Instance'
+    Value: !GetAtt Instance.PublicDnsName
