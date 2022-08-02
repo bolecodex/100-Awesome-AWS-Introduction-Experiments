@@ -42,7 +42,7 @@ public class WorkshopPipelineStack extends Stack{
         stageDeployment.addPost(
             CodeBuildStep.Builder.create("TestViewerEndpoint")
                 .commands(List.of("curl -Ssf $TestViewer_ENDPOINT_URL"))
-                .envFromCfnOutputs(Map.of('TestViewer_ENDPOINT_URL', deploy.hcViewerUrl))
+                .envFromCfnOutputs(Map.of("TestViewer_ENDPOINT_URL", deploy.hcViewerUrl))
                 .projectName("TestViewerEndpoint")
                 .build(),
 
@@ -50,9 +50,9 @@ public class WorkshopPipelineStack extends Stack{
                 .commands(List.of(
                     "curl -Ssf $TestAPIGateway_ENDPOINT_URL",
                     "curl -Ssf $TestAPIGateway_ENDPOINT_URL/hello",
-                    "curl -Ssf $TestAPIGateway_ENDPOINT_URL/test",
+                    "curl -Ssf $TestAPIGateway_ENDPOINT_URL/test"
                 ))
-                .envFromCfnOutputs(Map.of('TestAPIGateway_ENDPOINT_URL', deploy.hcEndpoint))
+                .envFromCfnOutputs(Map.of("TestAPIGateway_ENDPOINT_URL", deploy.hcEndpoint))
                 .projectName("TestAPIGatewayEndpoint")
                 .build()
         );

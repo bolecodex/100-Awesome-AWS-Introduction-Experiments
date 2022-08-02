@@ -9,11 +9,18 @@ public interface HitCounterProps {
 
     IFunction getDownstream();
 
+    Number getReadCapacity();
+
     public static class Builder {
         private IFunction downstream;
+        private Number readCapacity;
 
         public Builder downstream(final IFunction function) {
             this.downstream = function;
+            return this;
+        }
+        public Builder readCapacity(final Number readCapacity) {
+            this.readCapacity = readCapacity;
             return this;
         }
 
@@ -25,6 +32,10 @@ public interface HitCounterProps {
                 @Override
                 public IFunction getDownstream() {
                     return downstream;
+                }
+                @Override
+                public Number getReadCapacity() {
+                    return readCapacity;
                 }
             };
         }

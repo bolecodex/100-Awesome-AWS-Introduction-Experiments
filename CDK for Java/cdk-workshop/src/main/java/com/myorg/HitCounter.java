@@ -17,8 +17,15 @@ public class HitCounter extends Construct{
     private final Table table;
     private final Function handler;
 
-    public HitCounter(final Construct scope, final String id, final HitCounterProps props){
+    public HitCounter(final Construct scope, final String id, final HitCounterProps props) throws RuntimeException {
         super(scope, id);
+
+        if (props.getReadCapacity()!=null){
+            if (props.getReadCapacity().intValue()<5 || props.getReadCapacity().intValue()>20){
+                throw new RuntimeException("readCapacity must be greater than 5 or less than 20");
+            }
+        }
+        Number readCapacity = (props.getReadCapacity()==null)?5:props.getReadCapacity();
 
         this.table = Table.Builder.create(this, "Hits")
         .encryption(TableEncryption.AWS_MANAGED)
@@ -26,6 +33,7 @@ public class HitCounter extends Construct{
             .name("path")
             .type(AttributeType.STRING)
             .build())
+        .readCapacity(readCapacity)
         .build();
 
         final Map<String, String> environment = new HashMap<>();
@@ -39,6 +47,15 @@ public class HitCounter extends Construct{
         .code(Code.fromAsset("lambda"))
         .environment(environment)
         .build();
+
+        // Number readCapacity;
+        // if(props.getReadCapacity()==null){
+        //     readCapacity = 5;
+        // }else{
+        //     readCapacity = props.getReadCapacity();
+        // }
+
+
 
         this.table.grantReadWriteData(this.handler);
 
