@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: This template creates an Amazon ElastiCache Cluster. **WARNING** This
+  template creates Amazon EC2 instances and related resources. You will be billed
+  for the AWS resources used if you create a stack from this template.
+
+Parameters: 
+  Subnets:
+    Description: Select Database subnets.
+    Type: List<AWS::EC2::Subnet::Id>
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Network Parameters
+        Parameters:
+          - Subnets                   
+    ParameterLabels:
+      Subnets:
+        default: Data Tier Subnets
+
+
+Resources:
+  ElastiCacheSubnetGroup:
+    Type: 'AWS::ElastiCache::SubnetGroup'
+    Properties:
+      Description: Cache Subnet Group
+      SubnetIds: !Ref Subnets
+
+  ElastiCacheClientSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: SecurityGroup for ElastiCache Client
+      GroupName: WP Cache Client SG
+      VpcId: !ImportValue VPCID
+      Tags:
+        - Key: AppName
+          Value: ha-web-app
+
+  ElastiCacheSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: SecurityGroup for ElastiCache
+      GroupName: WP Cache SG
+      VpcId: !ImportValue VPCID
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 11211
+        ToPort: 11211
+        SourceSecurityGroupId: !GetAtt ElastiCacheClientSecurityGroup.GroupId
+      Tags:
+        - Key: AppName
+          Value: ha-web-app
+
+  ElastiCacheCluster:
+    Type: AWS::ElastiCache::CacheCluster
+    Properties: 
+      CacheNodeType: cache.m5.large
+      CacheSubnetGroupName: !Ref ElastiCacheSubnetGroup
+      ClusterName: WP-Elasticache
+      Engine: memcached
+      EngineVersion: 1.5.16
+      NumCacheNodes: 2
+      Port: 11211
+      VpcSecurityGroupIds: 
+        - !GetAtt ElastiCacheSecurityGroup.GroupId
+      Tags:
+        - Key: AppName
+          Value: ha-web-app
+
+  
+Outputs:
+  ElastiCacheConfigurationEndpointAddress:
+    Description: ElastiCacheConfigurationEndpointAddress
+    Value:
+      !GetAtt ElastiCacheCluster.ConfigurationEndpoint.Address
+
+  ElastiCacheConfigurationEndpointPort:
+    Description: ElastiCacheConfigurationEndpointPort
+    Value:
+      !GetAtt ElastiCacheCluster.ConfigurationEndpoint.Port
+
+  ElastiCacheSecurityGroupID:
+    Description: security group for elasticache
+    Value:
+      !GetAtt ElastiCacheSecurityGroup.GroupId
+
+  ElastiCacheClientSecurityGroupID:
+    Description: security group for elasticache client
+    Value:
+      !GetAtt ElastiCacheClientSecurityGroup.GroupId
+    Export:
+      Name: ElastiCacheClientSecurityGroupID

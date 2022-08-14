@@ -1,0 +1,187 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description:  This template deploys two security groups, an RDS subnet group,
+              and a highly available RDS instance. **WARNING** This
+              template creates Amazon RDS instances and related resources. You will be billed
+              for the AWS resources used if you create a stack from this template.
+
+
+Parameters:
+
+  DBClass:
+    AllowedValues:
+      - db.t2.small
+      - db.t2.medium
+      - db.t3.2xlarge
+      - db.t3.xlarge
+      - db.t3.large
+      - db.t3.medium
+      - db.t3.small
+      - db.t3.micro      
+      - db.r3.large
+      - db.r3.xlarge
+      - db.r3.2xlarge
+      - db.r3.4xlarge
+      - db.r3.8xlarge
+      - db.r4.large
+      - db.r4.xlarge
+      - db.r4.2xlarge
+      - db.r4.4xlarge
+      - db.r4.8xlarge
+      - db.r4.16xlarge
+      - db.r5.24xlarge
+      - db.r5.16xlarge
+      - db.r5.12xlarge
+      - db.r5.8xlarge
+      - db.r5.4xlarge
+      - db.r5.2xlarge
+      - db.r5.xlarge
+      - db.r5.large      
+    ConstraintDescription: Must be a valid RDS instance class.
+    Default: db.r5.large
+    Description: The Amazon RDS database instance class.
+    Type: String
+
+
+  DBName:
+    Default: wordpress
+    Description: The WordPress database name
+    Type: String
+    MinLength: '1'
+    MaxLength: '64'
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+    ConstraintDescription: must begin with a letter and contain only alphanumeric characters.
+
+  DBUser:    
+    Description: The WordPress database admin account username
+    Type: String
+    MinLength: '1'
+    MaxLength: '16'
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+    ConstraintDescription: must begin with a letter and contain only alphanumeric characters.
+
+  DBPassword:
+    NoEcho: 'true'
+    Description: The WordPress database admin account password
+    Type: String
+    MinLength: '8'
+    MaxLength: '41'
+    AllowedPattern: '[a-zA-Z0-9]*'
+    ConstraintDescription: must contain only alphanumeric characters.
+
+  Subnets:
+    Description: Select Database subnets.
+    Type: List<AWS::EC2::Subnet::Id>
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Database Parameters
+        Parameters:
+          - DBUser
+          - DBPassword
+          - Subnets                   
+
+    ParameterLabels:
+      DBUser:
+        default: Database Username
+      DBPassword:
+        default: Database Password
+      Subnets:
+        default: DB Subnets
+
+
+Resources:
+
+  WordPressDatabaseClientSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: WP Database Client SG
+      GroupDescription: WP Database Client Security Group
+      VpcId: !ImportValue VPCID
+      Tags:
+        - Key: AppName
+          Value: ha-web-app
+
+  WordPressDatabaseSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: WP Database SG
+      GroupDescription: Allows traffic on port 3306 from WP Database Client SG
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref WordPressDatabaseClientSG
+      VpcId: !ImportValue VPCID
+      Tags:
+        - Key: AppName
+          Value: ha-web-app      
+
+  DatabaseCluster:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      Engine: aurora
+      DatabaseName: !Ref DBName
+      MasterUsername: !Ref DBUser
+      MasterUserPassword: !Ref DBPassword
+      BackupRetentionPeriod: 1
+      DBSubnetGroupName: !Ref DatabaseSubnetGroup
+      VpcSecurityGroupIds:
+      - !Ref WordPressDatabaseSG
+      Tags:
+        - Key: AppName
+          Value: ha-web-app 
+
+  DatabaseSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties: 
+      DBSubnetGroupDescription: Create database subnet group to deploy RDS database across two availability zones      
+      SubnetIds: !Ref Subnets
+      Tags:
+        - Key: AppName
+          Value: ha-web-app 
+
+
+  DatabasePrimaryInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      Engine: aurora
+      DBClusterIdentifier: !Ref DatabaseCluster
+      DBInstanceClass: !Ref DBClass
+      DBSubnetGroupName: !Ref DatabaseSubnetGroup      
+      Tags:
+        - Key: AppName
+          Value: ha-web-app       
+          
+  DatabaseReplicaInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      Engine: aurora
+      DBClusterIdentifier: !Ref DatabaseCluster
+      DBInstanceClass: !Ref DBClass
+      DBSubnetGroupName: !Ref DatabaseSubnetGroup
+      Tags:
+        - Key: AppName
+          Value: ha-web-app       
+
+Outputs:
+  WordPressDBClientSG:
+    Description: A reference to the WordPressDB Client Security Group
+    Value: !Ref WordPressDatabaseClientSG
+    Export:
+      Name: WordPressDatabaseClientSG
+
+  WordPressDBSG:
+    Description: A reference to the WordPressDB Security Group
+    Value: !Ref WordPressDatabaseSG
+
+  DatabaseSubnetGroup:
+    Description: A reference to the Database Subnet Group
+    Value: !Ref DatabaseSubnetGroup
+
+  DatabaseClusterEndpoint:
+    Description: A reference to the Aurora DB DatabaseCluster
+    Value: !GetAtt DatabaseCluster.Endpoint.Address
+    Export:
+      Name: DBClusterEndpoint

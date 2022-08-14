@@ -1,0 +1,345 @@
+Description:  This template deploys a VPC, with a pair of public subnets, 
+  and private subnets for an application tier and a data tier
+  across two Availability Zones. It deploys an internet gateway, with a default
+  route on the public subnets. It deploys a pair of NAT gateways (one in each AZ),
+  and default routes for them in the private subnets.
+
+# Configure Parameters
+Parameters:
+  EnvironmentName:
+    Description: VPC for Wordpress Workshop
+    Type: String
+    Default: Wordpress-Workshop
+
+  VpcCIDR:
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: String
+    Default: 192.168.0.0/16
+
+  PublicSubnetACIDR:
+    Description: Please enter the IP range (CIDR notation) for the Public Subnet A in the first Availability Zone
+    Type: String
+    Default: 192.168.0.0/24
+
+  PublicSubnetBCIDR:
+    Description: Please enter the IP range (CIDR notation) for the Public Subnet B in the second Availability Zone
+    Type: String
+    Default: 192.168.1.0/24
+
+  AppSubnetACIDR:
+    Description: Please enter the IP range (CIDR notation) for the App Subnet A in the first Availability Zone
+    Type: String
+    Default: 192.168.2.0/24
+
+  AppSubnetBCIDR:
+    Description: Please enter the IP range (CIDR notation) for the App Subnet B in the second Availability Zone
+    Type: String
+    Default: 192.168.3.0/24
+
+  DataSubnetACIDR:
+    Description: Please enter the IP range (CIDR notation) for the Data Subnet A at in the first Availability Zone
+    Type: String
+    Default: 192.168.4.0/24
+
+  DataSubnetBCIDR:
+    Description: Please enter the IP range (CIDR notation) for the Data Subnet B in the second Availability Zone
+    Type: String
+    Default: 192.168.5.0/24
+
+Resources:
+  #Configure the VPC
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+        - Key: AppName
+          Value: ha-web-app
+#Configure the IGW
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+        - Key: AppName
+          Value: ha-web-app
+#Attach IGW
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+#Configure Public Subnet A
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnetACIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Subnet A (AZ1)
+        - Key: AppName
+          Value: ha-web-app
+#Configure Public Subnet B
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
+      CidrBlock: !Ref PublicSubnetBCIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Subnet B (AZ2)
+        - Key: AppName
+          Value: ha-web-app
+#Configure App Subnet A
+  AppSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs  '' ]
+      CidrBlock: !Ref AppSubnetACIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} App Subnet A (AZ1)
+        - Key: AppName
+          Value: ha-web-app
+#Configure App Subnet B
+  AppSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
+      CidrBlock: !Ref AppSubnetBCIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} App Subnet B (AZ2)
+        - Key: AppName
+          Value: ha-web-app
+#Configure Data Subnet A
+  DataSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs  '' ]
+      CidrBlock: !Ref DataSubnetACIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Data Subnet A (AZ1)
+        - Key: AppName
+          Value: ha-web-app
+#Configure Data Subnet B
+  DataSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
+      CidrBlock: !Ref DataSubnetBCIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Data Subnet B (AZ2)
+        - Key: AppName
+          Value: ha-web-app
+#Configure Nat Gateway A/B and allocate Elastic IPs
+  NatGatewayAEIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+
+  NatGatewayBEIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+
+  NatGatewayA:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayAEIP.AllocationId
+      SubnetId: !Ref PublicSubnetA
+
+  NatGatewayB:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayBEIP.AllocationId
+      SubnetId: !Ref PublicSubnetB
+#Configure Public Route Table
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Routes
+        - Key: AppName
+          Value: ha-web-app
+#Configure Public Route
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+#Associate Subnet A and B (Wordpress Public) to Route Table
+  PublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnetA
+
+  PublicSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnetB
+
+#Configure Application Subnet A Route Table
+  AppRouteTableA:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} App Routes (AZ1)
+        - Key: AppName
+          Value: ha-web-app
+
+  AppRouteA:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref AppRouteTableA
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayA
+
+  AppARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref AppRouteTableA
+      SubnetId: !Ref AppSubnetA
+#Configure Application Subnet B Route Table
+  AppRouteTableB:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} App Routes (AZ2)
+        - Key: AppName
+          Value: ha-web-app
+
+  AppRouteB:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref AppRouteTableB
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayB
+
+  AppBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref AppRouteTableB
+      SubnetId: !Ref AppSubnetB
+#Configure Data Subnet A Route Table
+  DataRouteTableA:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Data Routes (AZ1)
+        - Key: AppName
+          Value: ha-web-app
+
+  DataRouteA:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref DataRouteTableA
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayA
+
+  DataARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref DataRouteTableA
+      SubnetId: !Ref DataSubnetA
+
+#Configure Data Subnet B Route Table
+  DataRouteTableB:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Data Routes (AZ2)
+        - Key: AppName
+          Value: ha-web-app
+
+  DataRouteB:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref DataRouteTableB
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayB
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref DataRouteTableB
+      SubnetId: !Ref DataSubnetB
+
+Outputs:
+  VPC:
+    Description: A reference to the created VPC
+    Value: !Ref VPC
+    Export:
+      Name: VPCID
+
+  PublicSubnetA:
+    Description: A reference to the public subnet in the 1st Availability Zone
+    Value: !Ref PublicSubnetA
+    Export:
+      Name: PublicSubnetA
+
+  PublicSubnetB:
+    Description: A reference to the public subnet in the 2nd Availability Zone
+    Value: !Ref PublicSubnetB
+    Export:
+      Name: PublicSubnetB
+
+  AppSubnetA:
+    Description: A reference to the private Application subnet in the 1st Availability Zone
+    Value: !Ref AppSubnetA
+    Export:
+      Name: AppSubnetA
+
+  AppSubnetB:
+    Description: A reference to the private Application subnet in the 2nd Availability Zone
+    Value: !Ref AppSubnetB
+    Export:
+      Name: AppSubnetB
+
+  DataSubnetA:
+    Description: A reference to the private Data subnet in the 1st Availability Zone
+    Value: !Ref DataSubnetA
+    Export:
+      Name: DataSubnetA
+
+  DataSubnetB:
+    Description: A reference to the private Data subnet in the 2nd Availability Zone
+    Value: !Ref DataSubnetB
+    Export:
+      Name: DataSubnetB

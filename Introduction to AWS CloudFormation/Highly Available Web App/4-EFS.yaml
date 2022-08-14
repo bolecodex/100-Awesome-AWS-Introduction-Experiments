@@ -1,0 +1,86 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: This template creates an Amazon EFS file system and mount targets.
+
+Resources:
+  EFSSecurityClientGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: SecurityGroup for EFS file system Client
+      GroupName: WP FS Client SG
+      VpcId: !ImportValue VPCID
+      Tags:
+        - Key: AppName
+          Value: ha-web-app
+
+  EFSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: SecurityGroup for EFS file system
+      GroupName: WP FS SG
+      VpcId: !ImportValue VPCID
+      SecurityGroupIngress:
+      - IpProtocol: TCP
+        FromPort: 2049
+        ToPort: 2049
+        SourceSecurityGroupId: !GetAtt EFSSecurityClientGroup.GroupId
+      Tags:
+        - Key: AppName
+          Value: ha-web-app
+
+  FileSystemResource:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      PerformanceMode: generalPurpose
+      Encrypted: true
+      FileSystemTags:
+        - Key: AppName
+          Value: ha-web-app
+
+  MountTargetResource1:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref FileSystemResource
+      SubnetId: !ImportValue AppSubnetA
+      SecurityGroups:
+      - !GetAtt EFSSecurityGroup.GroupId
+
+  MountTargetResource2:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref FileSystemResource
+      SubnetId: !ImportValue AppSubnetB
+      SecurityGroups:
+      - !GetAtt EFSSecurityGroup.GroupId
+
+Outputs:
+  FileSystemID:
+    Description: File system ID
+    Value:
+      !GetAtt FileSystemResource.FileSystemId
+    Export:
+      Name: WPElasticFileSystemID
+
+  MountTargetResourceID1:
+    Description: Mount Target Resource ID1
+    Value:
+      !Ref MountTargetResource1
+
+  MountTargetResourceID2:
+    Description: Mount Target Resource ID1
+    Value:
+      !Ref MountTargetResource2
+
+  EFSSecurityGroupID:
+    Description: EFSSecurityGroup
+    Value:
+      !Ref EFSSecurityGroup
+
+  EFSSecurityClientGroupID:
+    Description: EFSSecurity Group for client
+    Value:
+      !Ref EFSSecurityClientGroup
+    Export:
+      Name: EFSSecurityClientGroupID
+
+
+

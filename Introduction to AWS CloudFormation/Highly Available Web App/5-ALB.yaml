@@ -1,0 +1,91 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: This template creates an Amazon Application Load Balancer and Target group to which Load Balancer distributes traffic. **WARNING** You will be billed for the AWS resources used if you create a stack from this template.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: Network
+      Parameters:
+        - Subnets
+    ParameterLabels:
+      Subnets:
+        default: Subnets for Application Load balancer.
+
+Parameters:    
+  Subnets:
+    Description: Subnets for Load Balancer
+    Type: List<AWS::EC2::Subnet::Id>
+
+Resources:
+  WPLoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: WPLoadBalancerSecurityGroup
+      GroupDescription: Allow http to WP LoadBalancer
+      VpcId: !ImportValue  VPCID
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      Tags:
+      - Key: AppName
+        Value: ha-web-app
+
+  WPAlbTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /wp-login.php
+      HealthCheckTimeoutSeconds: 5
+      Port: 80
+      Protocol: HTTP
+      Tags:
+      - Key: AppName
+        Value: ha-web-app
+      UnhealthyThresholdCount: 5
+      VpcId: !ImportValue  VPCID
+
+  AlbListenerHttp:
+    Type : AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn: !Ref WPAlbTargetGroup
+      LoadBalancerArn: !Ref WordPressELB
+      Port: 80
+      Protocol: HTTP
+
+          
+  WordPressELB: 
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing # or internal
+      Subnets: !Ref Subnets      
+      SecurityGroups: 
+        - Ref: WPLoadBalancerSecurityGroup
+      Tags:
+      - Key: AppName
+        Value: ha-web-app
+      
+
+Outputs:
+  ApplicationLoadBalancerDNSName:
+      Description: 'Application Load Balancer Hostname'
+      Value:
+        !GetAtt WordPressELB.DNSName
+      Export: 
+        Name: ALBDnsName
+  WPLoadBalancerSecurityGroupId:
+    Description: 'Security Group for Application Load Balancer'
+    Value:
+      !Ref WPLoadBalancerSecurityGroup
+    Export:
+      Name: ALBSecurityGroupId
+  WPAlbTargetGroupArn:
+    Description: 'ALB Target Group'
+    Value:
+      !Ref WPAlbTargetGroup
+    Export:
+      Name: WPAlbTargetGroup      

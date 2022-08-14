@@ -1,0 +1,31 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: This template creates an auto scaling fleet of wordpress application servers. 
+
+Resources:
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      Cooldown: 60
+      HealthCheckGracePeriod: 120
+      HealthCheckType: ELB
+      MaxSize: '8'
+      MinSize: '4'
+      VPCZoneIdentifier: 
+        - !ImportValue AppSubnetA
+        - !ImportValue AppSubnetB
+      LaunchConfigurationName: !ImportValue WordPressLaunchConfig
+      TargetGroupARNs:
+        - !ImportValue WPAlbTargetGroup
+      Tags:
+        - Key: AppName
+          Value: ha-web-app
+          PropagateAtLaunch: true    
+  ScalingPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref AutoScalingGroup
+      PolicyType: TargetTrackingScaling
+      TargetTrackingConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ASGAverageCPUUtilization
+        TargetValue: 80
