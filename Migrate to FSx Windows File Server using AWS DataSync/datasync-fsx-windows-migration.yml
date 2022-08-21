@@ -1,0 +1,507 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS DataSync to FSx Windows Migration Workshop
+Metadata:
+  License:
+    Description: |
+      Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+      Permission is hereby granted, free of charge, to any person obtaining a copy of this
+      software and associated documentation files (the "Software"), to deal in the Software
+      without restriction, including without limitation the rights to use, copy, modify,
+      merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+      permit persons to whom the Software is furnished to do so.
+
+      THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+      INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+      PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+      HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+      OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+      SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Security
+        Parameters:
+          - kp
+      - Label:
+          default: Windows Configuration
+        Parameters:
+          - domainName
+          - netBiosName
+          - commonPassword
+      - Label:
+          default: AMI IDs (do not edit)
+        Parameters:
+          - winAmi
+          - dsAmi
+    ParameterLabels:
+      kp:
+        default: 'EC2 Key Pair:'
+      domainName:
+        default: 'Active Directory Domain Name:'
+      netBiosName:
+        default: 'Domain NetBIOS name:'
+      commonPassword:
+        default: 'Common password for all users:'
+      winAmi:
+        default: 'Windows'
+      dsAmi:
+        default: 'DataSync'
+
+Parameters:
+  kp:
+    Description: '(NOTE: If you don''t see a key in the list you will need to create
+      one from the EC2 console in this region)'
+    Type: AWS::EC2::KeyPair::KeyName
+  domainName:
+    Default: "mydomain.test"
+    Type: String
+  netBiosName:
+    Default: "MYDOMAIN"
+    Type: String
+  commonPassword:
+    AllowedPattern: (?=^.{6,255}$)((?=.*\d)(?=.*[A-Z])(?=.*[a-z])|(?=.*\d)(?=.*[^A-Za-z0-9])(?=.*[a-z])|(?=.*[^A-Za-z0-9])(?=.*[A-Z])(?=.*[a-z])|(?=.*\d)(?=.*[A-Z])(?=.*[^A-Za-z0-9]))^.*
+    Description: Password for the domain Administrator user. MUST be at least 8 characters
+      containing AT LEAST ONE letter, number and symbol
+    MaxLength: '32'
+    MinLength: '8'
+    NoEcho: 'true'
+    Type: String
+  winAmi:
+    Type : 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-windows-latest/Windows_Server-2016-English-Full-Base'
+  dsAmi:
+    Type : 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/datasync/ami'
+
+Resources:
+
+  dmVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.11.0.0/22
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      InstanceTenancy: default
+      Tags:
+      - Key: Name
+        Value: DataMigrationWorkshopVPC
+  dmSubnetPublic:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref 'dmVPC'
+      CidrBlock: 10.11.0.0/24
+      MapPublicIpOnLaunch: 'True'
+      Tags:
+      - Key: Name
+        Value: DataMigrationWorkshopSubnetPublic
+  dmSubnetPrivate1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref 'dmVPC'
+      CidrBlock: 10.11.1.0/24
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
+      Tags:
+      - Key: Name
+        Value: DataMigrationWorkshopSubnetPrivate
+  dmSubnetPrivate2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref 'dmVPC'
+      CidrBlock: 10.11.2.0/24
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs: ""
+      Tags:
+      - Key: Name
+        Value: DataMigrationWorkshopSubnetPrivate
+  dmInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value: DataMigrationWorkshopIGW
+  dmAttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref 'dmVPC'
+      InternetGatewayId: !Ref 'dmInternetGateway'
+  dmRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref 'dmVPC'
+      Tags:
+      - Key: Name
+        Value: DataMigrationWorkshopRouteTable
+  dmSubnetPublicRouteAssociaton:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref 'dmSubnetPublic'
+      RouteTableId: !Ref 'dmRouteTable'
+  dmRoutetoInternet:
+    Type: AWS::EC2::Route
+    DependsOn: dmInternetGateway
+    Properties:
+      RouteTableId: !Ref 'dmRouteTable'
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref 'dmInternetGateway'
+
+  dmSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Data Migration Workshop - Security Group for all resources
+      VpcId: !Ref 'dmVPC'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: '0.0.0.0/0'
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: '0.0.0.0/0'
+        - IpProtocol: tcp
+          FromPort: '3389'
+          ToPort: '3389'
+          CidrIp: '0.0.0.0/0'
+        - IpProtocol: udp
+          FromPort: '3389'
+          ToPort: '3389'
+          CidrIp: '0.0.0.0/0'
+  dmSecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref dmSecurityGroup
+      IpProtocol: -1
+      SourceSecurityGroupId: !Ref dmSecurityGroup
+
+  adDS:
+    Type: AWS::DirectoryService::MicrosoftAD
+    Properties:
+      Edition: 'Standard'
+      Name: !Ref domainName
+      Password: !Ref commonPassword
+      ShortName: !Ref netBiosName
+      VpcSettings:
+        SubnetIds:
+          - !Ref dmSubnetPrivate1
+          - !Ref dmSubnetPrivate2
+        VpcId: !Ref dmVPC
+
+  # This is needed because the Managed AD service will be our DNS server.
+  dhcpOptions:
+    Type: AWS::EC2::DHCPOptions
+    Properties:
+      DomainName: !Ref domainName
+      DomainNameServers: !GetAtt adDS.DnsIpAddresses
+  dhcpOptionsAssociation:
+    Type: AWS::EC2::VPCDHCPOptionsAssociation
+    Properties:
+      DhcpOptionsId: !Ref dhcpOptions
+      VpcId: !Ref dmVPC
+
+  winInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref 'winInstanceIamRole'
+  winInstanceIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+        Version: '2012-10-17'
+
+  windowsServer:
+    Type: AWS::EC2::Instance
+    DependsOn: dhcpOptionsAssociation
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT30M
+        Count: 1
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          files:
+            c:\cfn\joindomain.ps1:
+              content: !Sub |
+                $adminuser = "${netBiosName}\Admin"
+                $adminpassword = ConvertTo-SecureString -AsPlainText "${commonPassword}" -Force
+                $cred = New-Object System.Management.Automation.PSCredential -ArgumentList $adminuser,$adminpassword
+                Add-Computer -DomainName "${domainName}" -Credential $cred
+                Restart-Computer
+            c:\cfn\initusersandgroups.ps1:
+              content: !Sub |
+                Install-WindowsFeature RSAT-AD-PowerShell,RSAT-ADDS-Tools
+                Import-Module ActiveDirectory
+
+                $adminuser = "${netBiosName}\Admin"
+                $adminpassword = ConvertTo-SecureString -AsPlainText "${commonPassword}" -Force
+                $cred = New-Object System.Management.Automation.PSCredential -ArgumentList $adminuser,$adminpassword
+
+                New-ADGroup -Name "Finance" -GroupScope Global -Credential $cred -Server "${domainName}"
+                New-ADGroup -Name "HR" -GroupScope Global -Credential $cred -Server "${domainName}"
+                New-ADGroup -Name "Legal" -GroupScope Global -Credential $cred -Server "${domainName}"
+
+                New-ADUser -Name "datasync" -SamAccountName "datasync" -UserPrincipalName "datasync@${domainName}" -AccountPassword (ConvertTo-SecureString "${commonPassword}" -AsPlainText -force) -PasswordNeverExpires $true -Enabled $true -Credential $cred -Server "${domainName}"
+                Add-ADGroupMember -Identity "AWS Delegated FSx Administrators" -Members "datasync" -Credential $cred -Server "${domainName}"
+            c:\cfn\initsharefolder.ps1:
+              content: !Sub |
+                Install-WindowsFeature File-Services
+
+                # Generate a 128 KB file with random data
+                $bytes = 128KB
+                [System.Security.Cryptography.RNGCryptoServiceProvider] $rng = New-Object System.Security.Cryptography.RNGCryptoServiceProvider
+                $rndbytes = New-Object byte[] $bytes
+                $rng.GetBytes($rndbytes)
+                $tmpfile = "$($env:TEMP)\test.dat"
+                [System.IO.File]::WriteAllBytes($tmpfile, $rndbytes)
+
+                $InheritanceFlag = @([System.Security.AccessControl.InheritanceFlags]::ContainerInherit,[System.Security.AccessControl.InheritanceFlags]::ObjectInherit)
+                $NoInheritanceFlag = [System.Security.AccessControl.InheritanceFlags]::None
+                $PropagationFlag = [System.Security.AccessControl.PropagationFlags]::None
+
+                $accessSystem = New-Object System.Security.AccessControl.FileSystemAccessRule("SYSTEM","FullControl",$InheritanceFlag,$PropagationFlag,"Allow")
+                $accessDA = New-Object System.Security.AccessControl.FileSystemAccessRule("${netBiosName}\AWS Delegated FSx Administrators","FullControl",$InheritanceFlag,$PropagationFlag,"Allow")
+                $accessDuInherit = New-Object System.Security.AccessControl.FileSystemAccessRule("Domain Users","Modify",$InheritanceFlag,$PropagationFlag,"Allow")
+                $accessDuNoInherit = New-Object System.Security.AccessControl.FileSystemAccessRule("Domain Users","Modify",$NoInheritanceFlag,$PropagationFlag,"Allow")
+                $accessLegal = New-Object System.Security.AccessControl.FileSystemAccessRule("${netBiosName}\Legal","Modify",$InheritanceFlag,$PropagationFlag,"Allow")
+                $accessHR = New-Object System.Security.AccessControl.FileSystemAccessRule("${netBiosName}\HR","Modify",$InheritanceFlag,$PropagationFlag,"Allow")
+                $accessFinance = New-Object System.Security.AccessControl.FileSystemAccessRule("${netBiosName}\Finance","Modify",$InheritanceFlag,$PropagationFlag,"Allow")
+
+                $owner = New-Object System.Security.Principal.NTAccount("${netBiosName}\Admin")
+                $group = New-Object System.Security.Principal.NTAccount("${netBiosName}\Domain Users")
+
+                function SetOwnerAndGroup{
+                    Param ($obj, $own, $grp)
+                    $acl = Get-Acl $obj
+                    $acl.SetOwner($own)
+                    $acl.SetGroup($grp)
+                    $acl | Set-Acl $obj
+                }
+
+                new-item c:\share1 -itemtype directory
+                $acl = Get-Acl c:\share1
+                $acl.SetAccessRuleProtection($True, $False)
+                $acl.SetAccessRule($accessSystem)
+                $acl.SetAccessRule($accessDA)
+                $acl.SetAccessRule($accessDuNoInherit)
+                $acl.SetOwner($owner)
+                $acl.SetGroup($group)
+                $acl | Set-Acl c:\share1
+
+                new-item c:\share1\Legal -itemtype directory
+                $acl = Get-Acl c:\share1\Legal
+                $acl.SetAccessRule($accessLegal)
+                $acl | Set-Acl c:\share1\Legal
+                new-item c:\share1\Legal\Compliance -itemtype directory
+                copy-item $tmpfile c:\share1\Legal\Compliance\for-review.dat
+                SetOwnerAndGroup c:\share1\Legal $owner $group
+                SetOwnerAndGroup c:\share1\Legal\Compliance $owner $group
+                SetOwnerAndGroup c:\share1\Legal\Compliance\for-review.dat $owner $group
+
+                new-item c:\share1\HR -itemtype directory
+                $acl = Get-Acl c:\share1\HR
+                $acl.SetAccessRule($accessHR)
+                $acl | Set-Acl c:\share1\HR
+                new-item c:\share1\HR\Alice -itemtype directory
+                copy-item $tmpfile c:\share1\HR\Alice\comp.dat
+                SetOwnerAndGroup c:\share1\HR $owner $group
+                SetOwnerAndGroup c:\share1\HR\Alice $owner $group
+                SetOwnerAndGroup c:\share1\HR\Alice\comp.dat $owner $group
+
+                new-item c:\share1\Finance -itemtype directory
+                $acl = Get-Acl c:\share1\Finance
+                $acl.SetAccessRule($accessFinance)
+                $acl | Set-Acl c:\share1\Finance
+                new-item c:\share1\Finance\Budget -itemtype directory
+                copy-item $tmpfile c:\share1\Finance\Budget\forecast.dat
+                new-item c:\share1\Finance\YearEnd -itemtype directory
+                copy-Item $tmpfile c:\share1\Finance\YearEnd\results.dat
+                SetOwnerAndGroup c:\share1\Finance $owner $group
+                SetOwnerAndGroup C:\share1\Finance\Budget $owner $group
+                SetOwnerAndGroup C:\share1\Finance\Budget\forecast.dat $owner $group
+                SetOwnerAndGroup C:\share1\Finance\YearEnd $owner $group
+                SetOwnerAndGroup C:\share1\Finance\YearEnd\results.dat $owner $group
+
+                new-item c:\share1\Shared -itemtype directory
+                $acl = Get-Acl c:\share1\Shared
+                $acl.SetAccessRule($accessDuInherit)
+                $acl | Set-Acl c:\share1\Shared
+                new-item c:\share1\Shared\Programs -itemtype directory
+                copy-Item $tmpfile c:\share1\Shared\Programs\anti-virus.exe
+                SetOwnerAndGroup c:\share1\Shared $owner $group
+                SetOwnerAndGroup c:\share1\Shared\Programs $owner $group
+                SetOwnerAndGroup c:\share1\Shared\Programs\anti-virus.exe $owner $group
+          commands:
+            1-joinDomain:
+              command: "powershell.exe c:\\cfn\\joindomain.ps1"
+              waitAfterCompletion: forever
+            2-initUsersAndGroups:
+              command: "powershell.exe c:\\cfn\\initusersandgroups.ps1"
+            3-initShareFolder:
+              command: "powershell.exe c:\\cfn\\initsharefolder.ps1"
+            4-finishUp:
+              command: !Sub "cfn-signal.exe -e 0 --stack ${AWS::StackId} --resource windowsServer --region ${AWS::Region}"
+    Properties:
+      ImageId: !Ref winAmi
+      InstanceType: t3.xlarge
+      KeyName: !Ref kp
+      IamInstanceProfile: !Ref 'winInstanceProfile'
+      Tags:
+        - Key: Name
+          Value: Windows-Server
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: '128'
+            DeleteOnTermination: 'true'
+            VolumeType: gp2
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: 'true'
+          DeviceIndex: '0'
+          GroupSet:
+            - !Ref 'dmSecurityGroup'
+          SubnetId: !Ref 'dmSubnetPublic'
+      UserData:
+        Fn::Base64:
+          !Sub |
+            <powershell>
+            $localpasswd = ConvertTo-SecureString "${commonPassword}" -asplaintext -force
+            Set-LocalUser -Name Administrator -Password $localpasswd
+            cfn-init.exe -v -s ${AWS::StackId} -r windowsServer --region ${AWS::Region}
+            </powershell>
+
+  fsxFS:
+    Type: AWS::FSx::FileSystem
+    DependsOn: dhcpOptionsAssociation
+    Properties:
+      FileSystemType: WINDOWS
+      StorageCapacity: 64
+      SubnetIds:
+        - !Ref dmSubnetPrivate1
+      SecurityGroupIds:
+        - !Ref dmSecurityGroup
+      Tags:
+        - Key: Name
+          Value: DataSync FSx Workshop
+      WindowsConfiguration:
+        ActiveDirectoryId: !Ref adDS
+        DeploymentType: SINGLE_AZ_1
+        ThroughputCapacity: 16
+
+  dataSyncVpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      SecurityGroupIds:
+        - !Ref dmSecurityGroup
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.datasync
+      SubnetIds:
+        - !Ref dmSubnetPrivate1
+      VpcEndpointType: Interface
+      VpcId: !Ref dmVPC
+
+  dataSyncAgentInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref 'dataSyncAgentIamRole'
+  dataSyncAgentIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+        Version: '2012-10-17'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+  dataSyncAgentRolePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action:
+              - datasync:*
+            Resource:
+              - '*'
+          - Effect: Allow
+            Action:
+              - iam:PassRole
+            Resource:
+              - '*'
+        Version: '2012-10-17'
+      PolicyName: policy
+      Roles:
+        - !Ref 'dataSyncAgentIamRole'
+
+  dataSyncAgent:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref dsAmi
+      InstanceType: m5.2xlarge
+      KeyName: !Ref kp
+      IamInstanceProfile: !Ref 'dataSyncAgentInstanceProfile'
+      Tags:
+        - Key: Name
+          Value: DataSyncAgent
+      InstanceInitiatedShutdownBehavior: stop
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: '80'
+            DeleteOnTermination: 'true'
+            VolumeType: gp2
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: 'true'
+          DeviceIndex: '0'
+          GroupSet:
+            - !Ref 'dmSecurityGroup'
+          SubnetId: !Ref 'dmSubnetPublic'
+
+  dataSyncLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 3
+      LogGroupName: !Join
+        - ''
+        - - DataSyncLogs-
+          - !Ref 'AWS::StackName'
+
+Outputs:
+  domainName:
+    Description:  Active Directory domain name
+    Value: !Ref domainName
+  netBiosName:
+    Description:  NetBIOS name for domain
+    Value: !Ref netBiosName
+  commonPassword:
+    Description:  Password used for all domain users
+    Value: !Ref commonPassword
+  windowsServerPrivateIP:
+    Description: Windows Server Private IP Address
+    Value: !GetAtt windowsServer.PrivateIp
+  dataSyncAgentPublicIP:
+    Description: DataSync Agent Public IP Address
+    Value: !GetAtt dataSyncAgent.PublicIp
+  dataSyncVpcEndpointId:
+    Description: DataSync VPC Endpoint Interface
+    Value: !Ref dataSyncVpcEndpoint
