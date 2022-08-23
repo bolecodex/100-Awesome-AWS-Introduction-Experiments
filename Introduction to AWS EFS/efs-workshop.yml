@@ -1,0 +1,649 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: Creates an Amazon EFS workshop environment
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: Virtual Private Cloud
+      Parameters:
+        - VpcCidr
+        - AvailabilityZones
+    - Label:
+        default: Amazon EFS
+      Parameters:
+        - PerformanceMode
+        - ThroughputMode
+    - Label:
+        default: Amazon EC2
+      Parameters:
+        - InstanceType0
+        - InstanceType1
+        - InstanceType2
+        - KeyPair
+    ParameterLabels:
+      AvailabilityZones:
+        default: Availability Zones
+      InstanceType0:
+        default: Instance type 0
+      InstanceType1:
+        default: Instance type 1
+      InstanceType2:
+        default: Instance type 2
+      KeyPair:
+        default: Key pair
+      PerformanceMode:
+        default: EFS performance mode
+      ThroughputMode:
+        default: EFS throughput mode
+      VpcCidr:
+        default: VPC CIDR block
+
+Parameters:
+  AvailabilityZones:
+    Description: Select two (2) Availability Zones (AZ). One public subnet and one private subnet will be created in each AZ.
+    Type: List<AWS::EC2::AvailabilityZone::Name>
+  PerformanceMode:
+    AllowedValues:
+    - generalPurpose
+    - maxIO
+    Default: generalPurpose
+    Type: String
+  ThroughputMode:
+    AllowedValues:
+    - bursting
+    - provisioned
+    Default: bursting
+    Type: String   
+  KeyPair:
+    Type: AWS::EC2::KeyPair::KeyName
+  InstanceType0:
+    AllowedValues:
+    - t2.micro
+    Default: t2.micro
+    Type: String
+  InstanceType1:
+    AllowedValues:
+    - m4.large
+    Default: m4.large
+    Type: String
+  InstanceType2:
+    AllowedValues:
+    - m5.2xlarge
+    Default: m5.2xlarge
+    Type: String
+  VpcCidr:
+    AllowedValues: 
+    - 10.0.0.0/16
+    - 173.31.0.0/16
+    - 192.168.0.0/16
+    Default: 10.0.0.0/16
+    Description: Select the private IPv4 CIDR for the VPC.
+    Type: String
+
+Resources:
+  AttachInternetGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref Vpc
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join [ '', [ 'VPC IGW | ', !Ref 'AWS::StackName' ] ]     
+  PrivateRouteTable0:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join [ '', [ 'Private Route Table | ', !Ref 'AWS::StackName' ] ]
+        - Key: Network
+          Value: Private
+      VpcId: !Ref Vpc
+  PrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join [ '', [ 'Private Route Table | ', !Ref 'AWS::StackName' ] ]
+        - Key: Network
+          Value: Private
+      VpcId: !Ref Vpc
+  PrivateRouteTableAssociation0:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet0
+      RouteTableId: !Ref PrivateRouteTable0
+  PrivateRouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable1
+  PrivateSubnet0:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [ 0, !Ref AvailabilityZones ]
+      CidrBlock: !Select [ 1, !Cidr [ !GetAtt Vpc.CidrBlock, 3, 8 ]]
+      Tags:
+        - Key: Name
+          Value: !Join [ '', [ 'Private Subnet 0 | ', !Ref 'AWS::StackName' ] ]
+        - Key: SubnetType
+          Value: Private
+      VpcId: !Ref Vpc
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [ 1, !Ref AvailabilityZones ]
+      CidrBlock: !Select [ 2, !Cidr [ !GetAtt Vpc.CidrBlock, 3, 8 ] ]
+      Tags:
+        - Key: Name
+          Value: !Join [ '', [ 'Private Subnet 1 | ', !Ref 'AWS::StackName' ] ]
+        - Key: SubnetType
+          Value: Private
+      VpcId: !Ref Vpc
+  PublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join [ '', [ 'Public Route Table | ', !Ref 'AWS::StackName' ] ]
+        - Key: Network
+          Value: Public
+      VpcId: !Ref Vpc
+  PublicRouteTableAssociation0:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet0
+      RouteTableId: !Ref PublicRouteTable
+  PublicRouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnet0:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [ 0, !Ref AvailabilityZones ]
+      CidrBlock: !Select [ 0, !Cidr [ !GetAtt Vpc.CidrBlock, 2, 4 ] ]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Join [ '', [ 'Public Subnet 0 | ', !Ref 'AWS::StackName' ] ]
+        - Key: SubnetType
+          Value: Public
+      VpcId: !Ref Vpc
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [ 1, !Ref AvailabilityZones ]
+      CidrBlock: !Select [ 1, !Cidr [ !GetAtt Vpc.CidrBlock, 2, 4 ] ]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Join [ '', [ 'Public Subnet 1 | ', !Ref 'AWS::StackName' ] ]
+        - Key: SubnetType
+          Value: Public
+      VpcId: !Ref Vpc
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Join [ '', [ 'VPC | ', !Ref 'AWS::StackName' ] ]
+  ClientSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Amazon EC2 instances
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: "Client security group" 
+      VpcId:
+        !Ref Vpc
+  ClientSecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties: 
+      GroupId: !Ref ClientSecurityGroup
+      IpProtocol: -1
+      SourceSecurityGroupId: !Ref ClientSecurityGroup
+  FileSystemSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Amazon EFS
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !Ref ClientSecurityGroup
+      Tags:
+        - Key: Name
+          Value: "File system security group"     
+      VpcId:
+        !Ref Vpc
+  FileSystemSecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties: 
+      GroupId: !Ref FileSystemSecurityGroup
+      IpProtocol: -1
+      SourceSecurityGroupId: !Ref FileSystemSecurityGroup
+
+  AmiInfoFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !Sub solution-references-${AWS::Region}
+        S3Key: fsx/amilookup-lin.zip
+      Handler: amilookup-lin.handler
+      Runtime: nodejs12.x
+      Timeout: 30
+      Role: !GetAtt LambdaExecutionRoleAmiInfo.Arn
+  AmiInfo:
+    Type: Custom::AmiInfo
+    Properties:
+      ServiceToken: !GetAtt AmiInfoFunction.Arn
+      Region: !Ref 'AWS::Region'
+      OSName: Amazon Linux 2 (x86_64)
+  Instance0:
+    DependsOn: FileSystem
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType0
+      Tags:
+        - Key: Name
+          Value: EFS Workshop Linux Instance 0
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: 1
+  Instance1:
+    DependsOn: FileSystem
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType1
+      Tags:
+        - Key: Name
+          Value: EFS Workshop Linux Instance 1
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: 1
+  Instance2:
+    DependsOn: FileSystem
+    Type: AWS::EC2::Instance
+    Properties:
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            DeleteOnTermination: true
+            VolumeSize: 80
+            VolumeType: gp2
+      InstanceType: !Ref InstanceType2
+      Tags:
+        - Key: Name
+          Value: EFS Workshop Linux Instance 2
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: 1
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Join [ '', [ 'template-0', !Ref 'AWS::StackName' ] ]
+      LaunchTemplateData:
+        IamInstanceProfile:
+          Name: !Ref InstanceProfile
+        ImageId: !GetAtt AmiInfo.Id
+        KeyName: !Ref KeyPair
+        Monitoring:
+          Enabled: true
+        NetworkInterfaces:
+          - DeviceIndex: 0
+            Groups:
+              - !Ref ClientSecurityGroup
+            SubnetId: !Ref PublicSubnet0
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              -
+                Key: Name
+                Value: EFS Workshop Instance 0
+        UserData:
+          Fn::Base64:
+              !Sub |
+                #cloud-config
+                repo_update: true
+                repo_upgrade: all
+
+                runcmd:
+                - curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
+                - unzip awscli-bundle.zip
+                - ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws
+                - sudo export PATH=/usr/local/bin:$PATH
+
+                - amazon-linux-extras install -y epel lustre2.10
+                - yum groupinstall -y "Development Tools"
+                - yum install -y fpart parallel iftop iperf3 hping3 tree nload git libaio-devel openmpi openmpi-devel amazon-efs-utils
+
+                - cd /home/ec2-user
+                - git clone https://github.com/bengland2/smallfile.git
+
+                - cd /home/ec2-user
+                - git clone https://github.com/hpc/ior.git
+                - export PATH=$PATH:/usr/lib64/openmpi/bin
+                - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib64/openmpi/lib/
+                - cd ior
+                - ./bootstrap
+                - ./configure
+                - make
+                - sudo cp src/ior /usr/local/bin
+                - cd /home/ec2-user
+
+                - filesystem_id=${FileSystem}
+                - instance_id=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+                - mount_point=/efs
+                - ebs_directory=/ebs
+                - mkdir -p ${!mount_point}
+                - mkdir -p ${!ebs_directory}
+                - mkdir -p ${!ebs_directory}/data-1m
+                - mkdir -p ${!ebs_directory}/dd
+                - mkdir -p ${!ebs_directory}/smallfile
+                - chown ec2-user:ec2-user ${!ebs_directory} -R
+                - echo "${!filesystem_id}:/ ${!mount_point} efs _netdev 0 0" >> /etc/fstab
+                - mount -a -t efs
+                - mkdir -p ${!mount_point}/cp/${!instance_id}
+                - mkdir -p ${!mount_point}/dd/${!instance_id}
+                - mkdir -p ${!mount_point}/fpsync/${!instance_id}
+                - mkdir -p ${!mount_point}/ior/${!instance_id}
+                - mkdir -p ${!mount_point}/parallelcp/${!instance_id}
+                - mkdir -p ${!mount_point}/parallelcpio/${!instance_id}
+                - mkdir -p ${!mount_point}/rsync/${!instance_id}
+                - mkdir -p ${!mount_point}/touch/${!instance_id}
+                - chown ec2-user:ec2-user ${!mount_point} -R
+                - python /home/ec2-user/smallfile/smallfile_cli.py --operation create --threads 1 --file-size 1024 --files 5000 --same-dir Y --dirs-per-dir 1024 --hash-into-dirs Y --files-per-dir 10240 --pause 500 --top /ebs/smallfile
+
+                - cp -R ${!ebs_directory}/smallfile/file_srcdir ${!ebs_directory}/data-1m/
+                - yum update -y
+                - reboot
+  LambdaExecutionRoleAmiInfo:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AWSLambdaExecute'
+      Path: "/"
+      Policies:
+      - PolicyName: root
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - ec2:DescribeImages
+            Resource: "*"
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+      - !Ref InstanceRole
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
+
+  FileSystem:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      FileSystemTags:
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+      PerformanceMode: !Ref PerformanceMode
+      ThroughputMode: !Ref ThroughputMode
+  MountTarget0:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref FileSystem
+      SecurityGroups:
+      - !Ref FileSystemSecurityGroup
+      SubnetId: !Ref PrivateSubnet0
+  MountTarget1:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref FileSystem
+      SecurityGroups:
+      - !Ref FileSystemSecurityGroup
+      SubnetId: !Ref PrivateSubnet1
+
+  EfsDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Join [ '_', [ !Ref 'AWS::Region', !Ref FileSystem ] ]
+      DashboardBody:
+        !Sub |
+          {
+              "widgets": [
+                  {
+                      "type": "metric",
+                      "x": 0,
+                      "y": 3,
+                      "width": 15,
+                      "height": 9,
+                      "properties": {
+                          "view": "timeSeries",
+                          "stacked": false,
+                          "metrics": [
+                              [ { "expression": "(m1)/PERIOD(m1)", "label": "Total Throughput (bytes/s)", "id": "e1", "yAxis": "left", "color": "#2ca02c" } ],
+                              [ { "expression": "(m2)/PERIOD(m2)", "label": "Data Write Throughput (bytes/s)", "id": "e2", "yAxis": "left", "color": "#1f77b4" } ],
+                              [ { "expression": "(m3)/PERIOD(m3)", "label": "Data Read Throughput (bytes/s)", "id": "e3", "yAxis": "left", "color": "#ff7f0e" } ],
+                              [ { "expression": "(m4)/PERIOD(m4)", "label": "Metadata Throughput (bytes/s)", "id": "e4", "yAxis": "left", "color": "#d62728" } ],
+                              [ "AWS/EFS", "TotalIOBytes", "FileSystemId", "${FileSystem}", { "id": "m1", "stat": "Sum", "period": 60, "yAxis": "right", "visible": false } ],
+                              [ ".", "DataWriteIOBytes", ".", ".", { "period": 60, "stat": "Sum", "id": "m2", "yAxis": "right", "visible": false } ],
+                              [ ".", "DataReadIOBytes", ".", ".", { "period": 60, "stat": "Sum", "id": "m3", "yAxis": "right", "visible": false } ],
+                              [ ".", "MetadataIOBytes", ".", ".", { "period": 60, "stat": "Sum", "id": "m4", "yAxis": "right", "visible": false } ]
+                          ],
+                          "region": "${AWS::Region}",
+                          "period": 60,
+                          "title": "Total Throughput (bytes/s)",
+                          "start": "-PT1H",
+                          "end": "P0D"
+                      }
+                  },
+                  {
+                      "type": "metric",
+                      "x": 15,
+                      "y": 18,
+                      "width": 9,
+                      "height": 6,
+                      "properties": {
+                          "view": "timeSeries",
+                          "stacked": false,
+                          "metrics": [
+                              [ { "expression": "(m1/1000)/m2", "label": "Data Write IO Size (KB)", "id": "e1", "color": "#1f77b4" } ],
+                              [ { "expression": "(m3/1000)/m4", "label": "Data Read IO Size (KB)", "id": "e2", "color": "#ff7f0e" } ],
+                              [ { "expression": "(m5/1000)/m6", "label": "Metadata IO Size (KB)", "id": "e3", "color": "#d62728" } ],
+                              [ "AWS/EFS", "DataWriteIOBytes", "FileSystemId", "${FileSystem}", { "stat": "Sum", "period": 60, "id": "m1", "visible": false } ],
+                              [ "...", { "stat": "SampleCount", "period": 60, "id": "m2", "visible": false } ],
+                              [ ".", "DataReadIOBytes", ".", ".", { "period": 60, "stat": "Sum", "id": "m3", "visible": false } ],
+                              [ "...", { "period": 60, "stat": "SampleCount", "id": "m4", "visible": false } ],
+                              [ ".", "MetadataIOBytes", ".", ".", { "period": 60, "stat": "Sum", "id": "m5", "visible": false } ],
+                              [ "...", { "period": 60, "stat": "SampleCount", "id": "m6", "visible": false } ]
+                          ],
+                          "region": "${AWS::Region}",
+                          "title": "Avg. IO Size (KB)",
+                          "period": 60,
+                          "start": "-PT1H",
+                          "end": "P0D"
+                      }
+                  },
+                  {
+                      "type": "metric",
+                      "x": 0,
+                      "y": 18,
+                      "width": 15,
+                      "height": 6,
+                      "properties": {
+                          "metrics": [
+                              [ { "expression": "((m1/1000000)/PERIOD(m1))", "label": "Avgerage Throughput (MB/s)", "id": "e1", "period": 60, "color": "#2ca02c", "yAxis": "left" } ],
+                              [ { "expression": "(m2/1048576)", "label": "Permitted Throughput (MB/s)", "id": "e2" } ],
+                              [ { "expression": "((e1)*100)/(e2)", "label": "Percent Throughput Utilization (%)", "id": "e3", "yAxis": "right" } ],
+                              [ { "expression": "(e2)-(e1)", "label": "Available Throughput (MB/s)", "id": "e5" } ],
+                              [ "AWS/EFS", "TotalIOBytes", "FileSystemId", "${FileSystem}", { "id": "m1", "visible": false, "stat": "Sum" } ],
+                              [ ".", "PermittedThroughput", ".", ".", { "id": "m2", "visible": false, "stat": "Sum" } ]
+                          ],
+                          "view": "timeSeries",
+                          "stacked": false,
+                          "region": "${AWS::Region}",
+                          "title": "Throughput Utilization (MB/s)",
+                          "period": 60,
+                          "stat": "Average",
+                          "start": "-PT1H",
+                          "end": "P0D"
+                      }
+                  },
+                  {
+                      "type": "metric",
+                      "x": 15,
+                      "y": 3,
+                      "width": 9,
+                      "height": 9,
+                      "properties": {
+                          "view": "timeSeries",
+                          "stacked": false,
+                          "metrics": [
+                              [ { "expression": "(m1)/PERIOD(m1)", "label": "Total iops", "id": "e1", "yAxis": "left", "stat": "SampleCount", "color": "#2ca02c" } ],
+                              [ { "expression": "(m2)/PERIOD(m2)", "label": "Data Write iops", "id": "e2", "stat": "SampleCount", "color": "#1f77b4" } ],
+                              [ { "expression": "(m3)/PERIOD(m3)", "label": "Data Read iops", "id": "e3", "stat": "SampleCount", "color": "#ff7f0e" } ],
+                              [ { "expression": "(m4)/PERIOD(m4)", "label": "Metadata iops", "id": "e4", "stat": "SampleCount", "color": "#d62728" } ],
+                              [ "AWS/EFS", "TotalIOBytes", "FileSystemId", "${FileSystem}", { "id": "m1", "stat": "SampleCount", "period": 60, "visible": false } ],
+                              [ ".", "DataWriteIOBytes", ".", ".", { "period": 60, "stat": "SampleCount", "id": "m2", "visible": false } ],
+                              [ ".", "DataReadIOBytes", ".", ".", { "period": 60, "stat": "SampleCount", "id": "m3", "visible": false } ],
+                              [ ".", "MetadataIOBytes", ".", ".", { "period": 60, "stat": "SampleCount", "id": "m4", "visible": false } ]
+                          ],
+                          "region": "${AWS::Region}",
+                          "period": 60,
+                          "title": "Total IOPS",
+                          "start": "-PT1H",
+                          "end": "P0D"
+                      }
+                  },
+                  {
+                      "type": "metric",
+                      "x": 15,
+                      "y": 12,
+                      "width": 9,
+                      "height": 6,
+                      "properties": {
+                          "view": "timeSeries",
+                          "metrics": [
+                              [ { "expression": "m2*100/m1", "label": "Data Write (%)", "id": "e1", "color": "#1f77b4" } ],
+                              [ { "expression": "m3*100/m1", "label": "Data Read (%)", "id": "e2", "color": "#ff7f0e" } ],
+                              [ { "expression": "m4*100/m1", "label": "Metadata (%)", "id": "e3", "color": "#d62728" } ],
+                              [ "AWS/EFS", "TotalIOBytes", "FileSystemId", "${FileSystem}", { "stat": "SampleCount", "period": 60, "id": "m1", "visible": false } ],
+                              [ ".", "DataWriteIOBytes", ".", ".", { "stat": "SampleCount", "period": 60, "id": "m2", "visible": false } ],
+                              [ ".", "DataReadIOBytes", ".", ".", { "stat": "SampleCount", "period": 60,  "id": "m3", "visible": false } ],
+                              [ ".", "MetadataIOBytes", ".", ".", { "stat": "SampleCount", "period": 60, "id": "m4", "visible": false } ]
+                          ],
+                          "region": "${AWS::Region}",
+                          "stacked": false,
+                          "title": "Percent IOPS Type",
+                          "period": 60,
+                          "start": "-PT1H",
+                          "end": "P0D"
+                      }
+                  },
+                  {
+                      "type": "metric",
+                      "x": 0,
+                      "y": 12,
+                      "width": 15,
+                      "height": 6,
+                      "properties": {
+                          "view": "timeSeries",
+                          "metrics": [
+                              [ { "expression": "m2*100/m1", "label": "Data Write (%)", "id": "e1", "stat": "Sum", "color": "#1f77b4" } ],
+                              [ { "expression": "m3*100/m1", "label": "Data Read (%)", "id": "e2", "stat": "Sum", "color": "#ff7f0e" } ],
+                              [ { "expression": "m4*100/m1", "label": "Metadata (%)", "id": "e3", "stat": "Sum", "color": "#d62728" } ],
+                              [ "AWS/EFS", "TotalIOBytes", "FileSystemId", "${FileSystem}", { "stat": "Sum", "period": 60, "id": "m1", "visible": false } ],
+                              [ ".", "DataWriteIOBytes", ".", ".", { "stat": "Sum", "period": 60, "id": "m2", "visible": false } ],
+                              [ ".", "DataReadIOBytes", ".", ".", { "stat": "Sum", "period": 60, "id": "m3", "visible": false } ],
+                              [ ".", "MetadataIOBytes", ".", ".", { "stat": "Sum", "period": 60, "id": "m4", "visible": false } ]
+                          ],
+                          "region": "${AWS::Region}",
+                          "stacked": false,
+                          "title": "Percent Throughput Type",
+                          "period": 60,
+                          "start": "-PT1H",
+                          "end": "P0D"
+                      }
+                  },
+                  {
+                      "type": "text",
+                      "x": 15,
+                      "y": 0,
+                      "width": 9,
+                      "height": 3,
+                      "properties": {
+                          "markdown": "\n# Amazon EFS file system: ${FileSystem}\n## Region: ${AWS::Region}\n"
+                      }
+                  },
+                  {
+                      "type": "metric",
+                      "x": 0,
+                      "y": 0,
+                      "width": 15,
+                      "height": 3,
+                      "styles": "undefined",
+                      "properties": {
+                          "view": "singleValue",
+                          "metrics": [
+                              [ { "expression": "m2", "label": "Permitted Throughput (bytes/s)", "id": "e1" } ],
+                              [ "Custom/EFS", "SizeInBytes", "FileSystemId", "${FileSystem}", { "label": "Metered Size (Bytes)", "id": "m1" } ],
+                              [ "AWS/EFS", "PermittedThroughput", ".", ".", { "label": "Permitted Throughput", "id": "m2", "visible": false } ],
+                              [ ".", "BurstCreditBalance", ".", ".", { "label": "BurstCreditBalance", "id": "m3" } ]
+                          ],
+                          "region": "${AWS::Region}",
+                          "period": 60,
+                          "title": "File system metrics",
+                          "start": "-PT1H",
+                          "end": "P0D"
+                      }
+                  }
+              ]
+          }
+
+Outputs:
+  FileSystemId:
+    Value: !Ref FileSystem
