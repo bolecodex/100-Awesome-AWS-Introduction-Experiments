@@ -1,0 +1,649 @@
+Resources:
+  CloudWatchAgentConfigurationB404662A:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Type: String
+      Value: |
+        {
+          "agent": {
+            "metrics_collection_interval": 60,
+            "logfile": "/opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.log",
+            "debug": false
+          },
+          "logs": {
+            "logs_collected": {
+              "files": {
+                "collect_list": [
+                  {
+                    "file_path": "/var/log/messages",
+                    "log_group_name": "/ec2/linux/var/log/messages",
+                    "log_stream_name": "{instance_id}"
+                  }
+                ]
+              }
+            }
+          },
+          "metrics": {
+            "namespace": "CWAgent",
+            "append_dimensions": {
+              "AutoScalingGroupName": "${aws:AutoScalingGroupName}",
+              "ImageId": "${aws:ImageId}",
+              "InstanceId": "${aws:InstanceId}",
+              "InstanceType": "${aws:InstanceType}"
+            },
+            "metrics_collected": {
+              "disk": {
+                "measurement": ["used_percent"],
+                "metrics_collection_interval": 60,
+                "resources": ["/"]
+              },
+              "mem": {
+                "measurement": ["mem_used_percent"],
+                "metrics_collection_interval": 60
+              },
+              "procstat": [
+                {
+                  "exe": "cloudwatch",
+                  "measurement": ["cpu_usage", "memory_rss", "memory_swap"]
+                }
+              ]
+            }
+          }
+        }
+      Description: SSM Parameter holding CloudWatchAgent configuration
+      Name: AmazonCloudWatch-linux
+  AmazonCloudWatchSetConfig:
+    Type: AWS::SSM::Association
+    Properties:
+      Name: AmazonCloudWatch-ManageAgent
+      ApplyOnlyAtCronInterval: false
+      AssociationName: AmazonCloudWatchSetConfig
+      Parameters:
+        action:
+          - configure
+        mode:
+          - ec2
+        optionalConfigurationLocation:
+          - AmazonCloudWatch-linux
+        optionalConfigurationSource:
+          - ssm
+        optionalOpenTelemetryCollectorConfigurationSource:
+          - ssm
+        optionalRestart:
+          - "yes"
+      ScheduleExpression: cron(0 */30 * * * ? *)
+      Targets:
+        - Key: InstanceIds
+          Values:
+            - "*"
+  ssmDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardBody: |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 0,
+              "width": 8,
+              "height": 4,
+              "properties": {
+                "metrics": [
+                  [
+                    "AWS/SSM-RunCommand",
+                    "CommandsDeliveryTimedOut",
+                    { "period": 300, "stat": "Sum" }
+                  ]
+                ],
+                "legend": {
+                  "position": "bottom"
+                },
+                "region": "eu-west-1",
+                "liveData": false,
+                "title": "CommandsDeliveryTimedOut: Sum"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 8,
+              "y": 0,
+              "width": 8,
+              "height": 4,
+              "properties": {
+                "metrics": [
+                  [
+                    "AWS/SSM-RunCommand",
+                    "CommandsFailed",
+                    { "period": 300, "stat": "Sum" }
+                  ]
+                ],
+                "legend": {
+                  "position": "bottom"
+                },
+                "region": "eu-west-1",
+                "liveData": false,
+                "title": "CommandsFailed: Sum"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 16,
+              "y": 0,
+              "width": 8,
+              "height": 4,
+              "properties": {
+                "metrics": [
+                  [
+                    "AWS/SSM-RunCommand",
+                    "CommandsSucceeded",
+                    { "period": 300, "stat": "Sum" }
+                  ]
+                ],
+                "legend": {
+                  "position": "bottom"
+                },
+                "region": "eu-west-1",
+                "liveData": false,
+                "title": "CommandsSucceeded: Sum"
+              }
+            }
+          ]
+        }
+  EE2A327EC4:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: ssmStack/EE
+  EEPublicSubnet1Subnet6C589DBA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 10.0.0.0/18
+      VpcId:
+        Ref: EE2A327EC4
+      AvailabilityZone: eu-west-1a
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: Public
+        - Key: aws-cdk:subnet-type
+          Value: Public
+        - Key: Name
+          Value: ssmStack/EE/PublicSubnet1
+  EEPublicSubnet1RouteTable0BE6ADB9:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: EE2A327EC4
+      Tags:
+        - Key: Name
+          Value: ssmStack/EE/PublicSubnet1
+  EEPublicSubnet1RouteTableAssociationED1ED9BF:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: EEPublicSubnet1RouteTable0BE6ADB9
+      SubnetId:
+        Ref: EEPublicSubnet1Subnet6C589DBA
+  EEPublicSubnet1DefaultRouteA5DC5CC8:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: EEPublicSubnet1RouteTable0BE6ADB9
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: EEIGW82233FF9
+    DependsOn:
+      - EEVPCGW468D62D9
+  EEPublicSubnet1EIPDD759605:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: ssmStack/EE/PublicSubnet1
+  EEPublicSubnet1NATGateway423C741A:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      SubnetId:
+        Ref: EEPublicSubnet1Subnet6C589DBA
+      AllocationId:
+        Fn::GetAtt:
+          - EEPublicSubnet1EIPDD759605
+          - AllocationId
+      Tags:
+        - Key: Name
+          Value: ssmStack/EE/PublicSubnet1
+  EEPublicSubnet2Subnet3DAC05DB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 10.0.64.0/18
+      VpcId:
+        Ref: EE2A327EC4
+      AvailabilityZone: eu-west-1b
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: Public
+        - Key: aws-cdk:subnet-type
+          Value: Public
+        - Key: Name
+          Value: ssmStack/EE/PublicSubnet2
+  EEPublicSubnet2RouteTable0E0E3503:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: EE2A327EC4
+      Tags:
+        - Key: Name
+          Value: ssmStack/EE/PublicSubnet2
+  EEPublicSubnet2RouteTableAssociation8BBA327C:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: EEPublicSubnet2RouteTable0E0E3503
+      SubnetId:
+        Ref: EEPublicSubnet2Subnet3DAC05DB
+  EEPublicSubnet2DefaultRoute3A751A46:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: EEPublicSubnet2RouteTable0E0E3503
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: EEIGW82233FF9
+    DependsOn:
+      - EEVPCGW468D62D9
+  EEPublicSubnet2EIP42588750:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: ssmStack/EE/PublicSubnet2
+  EEPublicSubnet2NATGateway8D351CCF:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      SubnetId:
+        Ref: EEPublicSubnet2Subnet3DAC05DB
+      AllocationId:
+        Fn::GetAtt:
+          - EEPublicSubnet2EIP42588750
+          - AllocationId
+      Tags:
+        - Key: Name
+          Value: ssmStack/EE/PublicSubnet2
+  EEPrivateSubnet1Subnet61890321:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 10.0.128.0/18
+      VpcId:
+        Ref: EE2A327EC4
+      AvailabilityZone: eu-west-1a
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: Private
+        - Key: aws-cdk:subnet-type
+          Value: Private
+        - Key: Name
+          Value: ssmStack/EE/PrivateSubnet1
+  EEPrivateSubnet1RouteTableBA3E0CE0:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: EE2A327EC4
+      Tags:
+        - Key: Name
+          Value: ssmStack/EE/PrivateSubnet1
+  EEPrivateSubnet1RouteTableAssociationB491D56F:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: EEPrivateSubnet1RouteTableBA3E0CE0
+      SubnetId:
+        Ref: EEPrivateSubnet1Subnet61890321
+  EEPrivateSubnet1DefaultRoute88C164DA:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: EEPrivateSubnet1RouteTableBA3E0CE0
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: EEPublicSubnet1NATGateway423C741A
+  EEPrivateSubnet2Subnet5AAEAA03:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 10.0.192.0/18
+      VpcId:
+        Ref: EE2A327EC4
+      AvailabilityZone: eu-west-1b
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: Private
+        - Key: aws-cdk:subnet-type
+          Value: Private
+        - Key: Name
+          Value: ssmStack/EE/PrivateSubnet2
+  EEPrivateSubnet2RouteTableA0CCEE06:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: EE2A327EC4
+      Tags:
+        - Key: Name
+          Value: ssmStack/EE/PrivateSubnet2
+  EEPrivateSubnet2RouteTableAssociation21FCFF5A:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: EEPrivateSubnet2RouteTableA0CCEE06
+      SubnetId:
+        Ref: EEPrivateSubnet2Subnet5AAEAA03
+  EEPrivateSubnet2DefaultRoute4FEE752E:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: EEPrivateSubnet2RouteTableA0CCEE06
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: EEPublicSubnet2NATGateway8D351CCF
+  EEIGW82233FF9:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: ssmStack/EE
+  EEVPCGW468D62D9:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId:
+        Ref: EE2A327EC4
+      InternetGatewayId:
+        Ref: EEIGW82233FF9
+  InstanceAtestinstanceInstanceSecurityGroup364A1A06:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ssmStack/Instance-A/test-instance/InstanceSecurityGroup
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic by default
+          IpProtocol: "-1"
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          Description: from 0.0.0.0/0:ALL ICMP
+          FromPort: -1
+          IpProtocol: icmp
+          ToPort: -1
+      Tags:
+        - Key: environment
+          Value: workshop
+        - Key: Name
+          Value: ssmStack/Instance-A/test-instance
+      VpcId:
+        Ref: EE2A327EC4
+  InstanceAtestinstanceInstanceProfile55DFBB6D:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - TeamRole
+  InstanceAtestinstanceA142BF03:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: eu-west-1a
+      IamInstanceProfile:
+        Ref: InstanceAtestinstanceInstanceProfile55DFBB6D
+      ImageId:
+        Ref: SsmParameterValueawsserviceamiamazonlinuxlatestamzn2amihvmarm64gp2C96584B6F00A464EAD1953AFF4B05118Parameter
+      InstanceType: t4g.micro
+      SecurityGroupIds:
+        - Fn::GetAtt:
+            - InstanceAtestinstanceInstanceSecurityGroup364A1A06
+            - GroupId
+      SubnetId:
+        Ref: EEPrivateSubnet1Subnet61890321
+      Tags:
+        - Key: environment
+          Value: workshop
+        - Key: Name
+          Value: ssmStack/Instance-A/test-instance
+      UserData:
+        Fn::Base64: |-
+          #!/bin/bash
+          yum install amazon-cloudwatch-agent -y
+          /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c ssm:AmazonCloudWatch-linux
+
+          cd /tmp
+          aws s3 cp s3://workshop-template-bucket/logger.py .
+          chmod a+x logger.py
+  InstanceBtestinstanceInstanceSecurityGroup387F2F7A:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ssmStack/Instance-B/test-instance/InstanceSecurityGroup
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic by default
+          IpProtocol: "-1"
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          Description: from 0.0.0.0/0:ALL ICMP
+          FromPort: -1
+          IpProtocol: icmp
+          ToPort: -1
+      Tags:
+        - Key: environment
+          Value: workshop
+        - Key: Name
+          Value: ssmStack/Instance-B/test-instance
+      VpcId:
+        Ref: EE2A327EC4
+  InstanceBtestinstanceInstanceProfileB0AD13DB:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - TeamRole
+  InstanceBtestinstance604248CD:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: eu-west-1a
+      IamInstanceProfile:
+        Ref: InstanceBtestinstanceInstanceProfileB0AD13DB
+      ImageId:
+        Ref: SsmParameterValueawsserviceamiamazonlinuxlatestamzn2amihvmarm64gp2C96584B6F00A464EAD1953AFF4B05118Parameter
+      InstanceType: t4g.micro
+      SecurityGroupIds:
+        - Fn::GetAtt:
+            - InstanceBtestinstanceInstanceSecurityGroup387F2F7A
+            - GroupId
+      SubnetId:
+        Ref: EEPrivateSubnet1Subnet61890321
+      Tags:
+        - Key: environment
+          Value: workshop
+        - Key: Name
+          Value: ssmStack/Instance-B/test-instance
+      UserData:
+        Fn::Base64: |-
+          #!/bin/bash
+          yum install amazon-cloudwatch-agent -y
+          /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c ssm:AmazonCloudWatch-linux
+
+          cd /tmp
+          aws s3 cp s3://workshop-template-bucket/logger.py .
+          chmod a+x logger.py
+  InstanceCtestinstanceInstanceSecurityGroup7B6CDE18:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ssmStack/Instance-C/test-instance/InstanceSecurityGroup
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic by default
+          IpProtocol: "-1"
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          Description: from 0.0.0.0/0:ALL ICMP
+          FromPort: -1
+          IpProtocol: icmp
+          ToPort: -1
+      Tags:
+        - Key: environment
+          Value: workshop
+        - Key: Name
+          Value: ssmStack/Instance-C/test-instance
+      VpcId:
+        Ref: EE2A327EC4
+  InstanceCtestinstanceInstanceProfileF6D08129:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - TeamRole
+  InstanceCtestinstanceE908D38B:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: eu-west-1a
+      IamInstanceProfile:
+        Ref: InstanceCtestinstanceInstanceProfileF6D08129
+      ImageId:
+        Ref: SsmParameterValueawsserviceamiamazonlinuxlatestamzn2amihvmarm64gp2C96584B6F00A464EAD1953AFF4B05118Parameter
+      InstanceType: t4g.micro
+      SecurityGroupIds:
+        - Fn::GetAtt:
+            - InstanceCtestinstanceInstanceSecurityGroup7B6CDE18
+            - GroupId
+      SubnetId:
+        Ref: EEPrivateSubnet1Subnet61890321
+      Tags:
+        - Key: environment
+          Value: workshop
+        - Key: Name
+          Value: ssmStack/Instance-C/test-instance
+      UserData:
+        Fn::Base64: |-
+          #!/bin/bash
+          yum install amazon-cloudwatch-agent -y
+          /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c ssm:AmazonCloudWatch-linux
+
+          cd /tmp
+          aws s3 cp s3://workshop-template-bucket/logger.py .
+          chmod a+x logger.py
+  InstanceDtestinstanceInstanceSecurityGroupD18B9556:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ssmStack/Instance-D/test-instance/InstanceSecurityGroup
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic by default
+          IpProtocol: "-1"
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          Description: from 0.0.0.0/0:ALL ICMP
+          FromPort: -1
+          IpProtocol: icmp
+          ToPort: -1
+      Tags:
+        - Key: environment
+          Value: workshop
+        - Key: Name
+          Value: ssmStack/Instance-D/test-instance
+      VpcId:
+        Ref: EE2A327EC4
+  InstanceDtestinstanceInstanceProfile8470A1E9:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - TeamRole
+  InstanceDtestinstanceDAA91129:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: eu-west-1a
+      IamInstanceProfile:
+        Ref: InstanceDtestinstanceInstanceProfile8470A1E9
+      ImageId:
+        Ref: SsmParameterValueawsserviceamiamazonlinuxlatestamzn2amihvmarm64gp2C96584B6F00A464EAD1953AFF4B05118Parameter
+      InstanceType: t4g.micro
+      SecurityGroupIds:
+        - Fn::GetAtt:
+            - InstanceDtestinstanceInstanceSecurityGroupD18B9556
+            - GroupId
+      SubnetId:
+        Ref: EEPrivateSubnet1Subnet61890321
+      Tags:
+        - Key: environment
+          Value: workshop
+        - Key: Name
+          Value: ssmStack/Instance-D/test-instance
+      UserData:
+        Fn::Base64: |-
+          #!/bin/bash
+          yum install amazon-cloudwatch-agent -y
+          /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c ssm:AmazonCloudWatch-linux
+
+          cd /tmp
+          aws s3 cp s3://workshop-template-bucket/logger.py .
+          chmod a+x logger.py
+  InstanceEtestinstanceInstanceSecurityGroup682930AF:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ssmStack/Instance-E/test-instance/InstanceSecurityGroup
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic by default
+          IpProtocol: "-1"
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          Description: from 0.0.0.0/0:ALL ICMP
+          FromPort: -1
+          IpProtocol: icmp
+          ToPort: -1
+      Tags:
+        - Key: environment
+          Value: workshop
+        - Key: Name
+          Value: ssmStack/Instance-E/test-instance
+      VpcId:
+        Ref: EE2A327EC4
+  InstanceEtestinstanceInstanceProfile52C33B3A:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - TeamRole
+  InstanceEtestinstanceFD2332AA:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: eu-west-1a
+      IamInstanceProfile:
+        Ref: InstanceEtestinstanceInstanceProfile52C33B3A
+      ImageId:
+        Ref: SsmParameterValueawsserviceamiamazonlinuxlatestamzn2amihvmarm64gp2C96584B6F00A464EAD1953AFF4B05118Parameter
+      InstanceType: t4g.micro
+      SecurityGroupIds:
+        - Fn::GetAtt:
+            - InstanceEtestinstanceInstanceSecurityGroup682930AF
+            - GroupId
+      SubnetId:
+        Ref: EEPrivateSubnet1Subnet61890321
+      Tags:
+        - Key: environment
+          Value: workshop
+        - Key: Name
+          Value: ssmStack/Instance-E/test-instance
+      UserData:
+        Fn::Base64: |-
+          #!/bin/bash
+          yum install amazon-cloudwatch-agent -y
+          /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c ssm:AmazonCloudWatch-linux
+
+          cd /tmp
+          aws s3 cp s3://workshop-template-bucket/logger.py .
+          chmod a+x logger.py
+Parameters:
+  SsmParameterValueawsserviceamiamazonlinuxlatestamzn2amihvmarm64gp2C96584B6F00A464EAD1953AFF4B05118Parameter:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-arm64-gp2
+
