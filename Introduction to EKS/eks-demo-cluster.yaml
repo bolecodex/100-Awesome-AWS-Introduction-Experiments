@@ -9,21 +9,9 @@ metadata:
   
 availabilityZones: ["us-east-1a", "us-east-1b", "us-east-1c"]
 
-vpc:
-  cidr: "192.168.0.0/16" # CIDR of VPC for use in EKS Cluster
-
 managedNodeGroups:
   - name: node-group # Name of node group in EKS Cluster
     instanceType: t2.micro # Instance type for node group
     desiredCapacity: 3 # The number of worker node in EKS Cluster
-    volumeSize: 10  # EBS Volume for worker node (unit: GiB)
-    iam:
-      withAddonPolicies:
-        imageBuilder: true # Add permission for Amazon ECR
-        # albIngress: true  # Add permission for ALB Ingress
-        cloudWatch: true # Add permission for CloudWatch
-        autoScaler: true # Add permission Auto Scaling
-
-cloudWatch:
-  clusterLogging:
-    enableTypes: ["*"]
+    ssh:
+      enableSsm: true
