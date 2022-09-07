@@ -53,3 +53,6 @@ eksctl create nodegroup --cluster=eks-demo
 # Create microservice
 kubectl apply -f game-2048.yaml
 kubectl port-forward service/service-2048 8080:80 -n game-2048
+
+# Delete EKS Cluster
+eksctl delete cluster -f eks-demo-cluster.yaml 
