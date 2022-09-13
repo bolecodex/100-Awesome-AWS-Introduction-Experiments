@@ -2,9 +2,14 @@ sudo wget 'https://github.com/aws-samples/aws-analytics-immersion-day/archive/re
 
 sudo unzip -u main.zip
 
+sudo yum -y insll python-pip
+
+sudo pip install csvkit
+
 sudo chmod +x ./aws-analytics-immersion-day-main/set-up-hands-on-lab.sh
 
 sudo ./aws-analytics-immersion-day-main/set-up-hands-on-lab.sh
+
 
 # S3 Prefix
 json-data/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/
@@ -13,7 +18,7 @@ json-data/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=
 error-json/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/!{firehose:error-output-type}
 
 
-python3 gen_kinesis_data.py -I online_retail.csv \
+python3 gen_kinesis_data.py -I resources/online_retail.csv \
  --region-name us-west-2 \
  --service-name kinesis \
  --out-format json \
