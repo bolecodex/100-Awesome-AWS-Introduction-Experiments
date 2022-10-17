@@ -1,3 +1,72 @@
+docker -v
+docker pull nginx
+docker run -d -p 8080:80 --name nginx nginx
+docker ps
+docker logs nginx
+docker exec -it nginx /bin/bash
+cd /usr/share/nginx/html
+cat index.html
+exit
+
+docker stop nginx
+docker ps -a
+docker rm nginx
+docker rmi nginx
+
+mkdir demo
+cd demo
+
+# Dockerfile
+FROM nginx
+COPY index.html /usr/share/nginx/html
+
+docker build -t nginx2.0 .
+docker history nginx2.0
+docker images
+docker run -d -p 8080:80 --name nginx nginx2.0
+docker inspect nginx
+docker ps
+docker stop nginx
+docker rm nginx
+
+docker run -d -p 8080:80 -v /home/ec2-user/environment/demo/index.html:/usr/share/nginx/html/index.html:ro --name nginx nginx2.0
+
+-----------------------------------------------------------
+cd ..
+mkdir demo2
+cd demo2
+
+echo 'from flask import Flask
+
+app = Flask(__name__)
+
+@app.route("/")
+def hello():
+    return "hello world!"
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0")' > app.py
+
+python --version
+pip install flask
+python app.py
+
+touch Dockerfile
+
+FROM python:3.8-alpine
+RUN pip install flask
+COPY app.py /app.py
+CMD ["python", "app.py"]
+
+docker build -t python-hello-world .
+docker run -d -p 8080:5000 python-hello-world
+
+export DOCKERHUB_USERNAME=bolecodex
+docker login docker.io -u $DOCKERHUB_USERNAME
+docker tag python-hello-world $DOCKERHUB_USERNAME/python-hello-world
+docker push $DOCKERHUB_USERNAME/python-hello-world
+
+
 git clone https://github.com/bemer/containers-on-aws-workshop.git
 
 cd containers-on-aws-workshop/00-Application/

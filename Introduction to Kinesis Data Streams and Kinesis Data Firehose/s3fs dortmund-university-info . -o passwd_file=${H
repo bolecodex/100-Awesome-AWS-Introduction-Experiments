@@ -1,0 +1,135 @@
+s3fs dortmund-university-info . -o passwd_file=${HOME}/.passwd-s3fs
+
+
+AKIARBPQUMQBJ3N32U54
+
+/SwY58MMG+d7B9Zcn6nthR+LZ3dGQqDDz15iGbwS
+
+
+echo AKIARBPQUMQBJ3N32U5:/SwY58MMG+d7B9Zcn6nthR+LZ3dGQqDDz15iGbwS > ${HOME}/.passwd-s3fs
+chmod 600 ${HOME}/.passwd-s3fs
+
+
+sudo s3fs dortmund-university-info /home/ec2-user/environment/mount -o passwd_file=${HOME}/.passwd-s3fs
+
+
+sudo s3fs study-materials-dortmund /home/ubuntu/bucket  -o passwd_file=${HOME}/.passwd-s3fs,nonempty,rw,allow_other,mp_umask=002,uid=1000,gid=1000 -o url=https://s3.eu-central-1.amazonaws.com,endpoint=eu-central-1,use_path_request_style -o dbglevel=info -f -o curldbg
+
+
+mount |grep dortmund
+
+
+sudo s3fs study-materials-dortmund /home/ec2-user/environment/bucket -o passwd_file=${HOME}/.passwd-s3fs -o url=https://url.to.s3/ -o use_path_request_style
+
+
+s3fs study-materials-dortmund /home/ubuntu/bucket -o passwd_file=${HOME}/.passwd-s3fs -o dbglevel=info -f -o curldbg
+
+study-materials-dortmund /home/ubuntu/bucket fuse.s3fs _netdev,allow_other 0 0
+
+
+aws s3 sync /home/ubuntu/bucket s3://study-materials-dortmund 
+
+
+sudo s3fs study-materials-dortmund /home/ubuntu/bucket  -o passwd_file=$HOME/.passwd-s3fs,nonempty,rw,allow_other,mp_umask=002,uid=1000,gid=1000 -o url=http://s3.eu-central-1.amazonaws.com,endpoint=eu-central-1,use_path_request_style
+
+
+
+docker build . -t s3fs:latest --build-arg BUCKET_NAME=study-materials-dortmund
+
+docker run -it -e ACCESS_KEY_ID=AKIARBPQUMQBIQIDSE4W -e SECRET_ACCESS_KEY=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 --privileged s3fs:latest
+
+
+docker build . -t s3fs:latest --build-arg BUCKET_NAME=study-materials-dortmund
+
+docker run -it --rm -p 8080:80 -v `pwd`:/s3_bucket --entrypoint /bin/bash -e ACCESS_KEY_ID=AKIARBPQUMQBIQIDSE4W -e SECRET_ACCESS_KEY=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 --privileged s3fs:latest
+
+mount -a
+
+
+docker build . -t s3fs:latest --build-arg BUCKET_NAME=study-materials-dortmund --build-arg ACCESS_KEY_ID=AKIARBPQUMQBIQIDSE4W --build-arg SECRET_ACCESS_KEY=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
+
+
+
+
+docker run -it --rm -p 80:80 -v `pwd`:/var/www clue/h5ai
+
+
+docker build . -t app:latest
+
+
+docker run --rm -p 8080:80 -v `pwd`:/var/www -t -i --privileged \
+  -e AWS_ACCESS_KEY_ID=AKIARBPQUMQBIQIDSE4W \
+  -e AWS_SECRET_ACCESS_KEY=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 \
+  -e AWS_STORAGE_BUCKET_NAME=study-materials-dortmund \
+  app:latest ls /mnt
+
+
+docker run --rm -p 8080:80 -it nephatrine/nginx-h5ai:latest /bin/bash
+
+
+docker run -it --rm -p 8080:80 -v `pwd`:/var/www clue/h5ai
+
+
+docker run --rm -t -i --privileged \
+  -e AWS_ACCESS_KEY_ID=AKIARBPQUMQBIQIDSE4W \
+  -e AWS_SECRET_ACCESS_KEY=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 \
+  -e AWS_STORAGE_BUCKET_NAME=study-materials-dortmund \
+  docker.io/panubo/s3fs:1.87 ls /mnt
+
+
+
+#!/bin/sh
+export PATH=/usr/local/bin:$PATH;
+
+cd /
+mkdir files
+cd files && touch test.txt
+yum update
+yum install docker -y
+service docker start
+# Docker login notes:
+#   - For no email, just put one blank space.
+#   - Also the private repo protocol and version are needed for docker
+#     to properly setup the .dockercfg file to work with compose
+docker login --username="bolecodex" --password="Example.password"
+mv /root/.dockercfg /home/ec2-user/.dockercfg
+chown ec2-user:ec2-user /home/ec2-user/.dockercfg
+usermod -a -G docker ec2-user
+curl -L https://github.com/docker/compose/releases/download/1.7.1/docker-compose-`uname -s`-uname -m > /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
+chown root:docker /usr/local/bin/docker-compose
+cat <<EOF >/home/ec2-user/docker-compose.yml
+services:
+  s3fs:
+    container_name: s3fs
+    image: efrecon/s3fs:1.91
+    restart: unless-stopped
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - 'apparmor:unconfined'
+    devices:
+      - /dev/fuse
+    volumes:
+      - '/files:/opt/s3fs/bucket:rshared'
+    environment:
+      AWS_S3_BUCKET: '${AWS_S3_BUCKET}'
+      AWS_S3_ACCESS_KEY_ID: '${AWS_S3_ACCESS_KEY_ID}'
+      AWS_S3_SECRET_ACCESS_KEY: '${AWS_S3_SECRET_ACCESS_KEY}'
+      AWS_S3_AUTHFILE: '${AWS_S3_AUTHFILE}'
+      AWS_S3_SECRET_ACCESS_KEY_FILE: '${AWS_S3_SECRET_ACCESS_KEY_FILE}'
+      AWS_S3_URL: '${AWS_S3_URL}'
+      AWS_S3_MOUNT: '/opt/s3fs/bucket'
+      S3FS_ARGS: ''
+      S3FS_DEBUG: 0
+      UID: 1000
+      GID: 1000
+  h5ai:
+    image: clue/h5ai
+    ports:
+      - "80:80"
+    volumes:
+      - /files:/var/www
+EOF
+chown ec2-user:ec2-user /home/ec2-user/docker-compose.yml
+/usr/local/bin/docker-compose -f /home/ec2-user/docker-compose.yml up -d
