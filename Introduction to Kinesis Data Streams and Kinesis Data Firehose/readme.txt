@@ -1,4 +1,4 @@
-sudo wget 'https://github.com/aws-samples/aws-analytics-immersion-day/archive/refs/heads/main.zip'
+sudo wget 'https://github.com/aws-samples/aws-analytics-immersion-day/archive/refs/heads/main.zip' 
 
 sudo unzip -u main.zip
 
