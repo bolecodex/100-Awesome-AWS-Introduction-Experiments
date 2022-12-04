@@ -2,16 +2,11 @@
 rm -vf ${HOME}/.aws/credentials
 aws sts get-caller-identity --query Arn
 
-# Update AWS CLI
-sudo pip install --upgrade awscli
-aws --version
-
 # Update AWS CLI to version 2
-sudo yum erase awscli
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip awscliv2.zip
-sudo ./aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws --update
-
+sudo ./aws/install
+aws --version
 
 # Install kubectl
 sudo curl -o /usr/local/bin/kubectl  \
