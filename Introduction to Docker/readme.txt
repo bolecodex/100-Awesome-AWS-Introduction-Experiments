@@ -66,6 +66,15 @@ docker login docker.io -u $DOCKERHUB_USERNAME
 docker tag python-hello-world $DOCKERHUB_USERNAME/python-hello-world
 docker push $DOCKERHUB_USERNAME/python-hello-world
 
+----------------------------------------------------
+docker pull alexwhen/docker-2048
+docker run -d -p 8080:80 --name game-2048 alexwhen/docker-2048
+
+docker pull bharathshetty4/supermario
+docker run -d -p 8080:8080 --name supermario bharathshetty4/supermario
+
+--------------------------------------------------------------
+
 
 git clone https://github.com/bemer/containers-on-aws-workshop.git
 
