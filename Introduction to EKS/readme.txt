@@ -21,7 +21,6 @@ eksctl version
 
 
 # Create Container Image
-cd ~/environment/
 docker build -t test-image . 
 docker images
 docker run -p 8080:80 --name test-nginx test-image
