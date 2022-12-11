@@ -28,3 +28,9 @@ export DB_HOST=database-1.cjsff9e3cpj2.us-east-1.rds.amazonaws.com
 export DB_USER=admin
 export DB_PASS=Password!
 export DB_NAME=tutorial
+
+
+
+# if the database is PostgreSQL, use the following commands
+sudo amazon-linux-extras install postgresql10
+psql --username=postgre -h database-1-instance-1.cjsff9e3cpj2.us-east-1.rds.amazonaws.com postgres
