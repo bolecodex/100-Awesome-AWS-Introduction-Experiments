@@ -19,6 +19,7 @@ Password!
 mysql -h database-1.cjsff9e3cpj2.us-east-1.rds.amazonaws.com -P 3306 -u admin -p < seed.sql
 
 
+python
 import redis
 client = redis.Redis.from_url('redis://redis-cluster-001.ovj7jw.0001.use1.cache.amazonaws.com:6379')
 client.ping()
