@@ -30,6 +30,8 @@ export DB_USER=admin
 export DB_PASS=Password!
 export DB_NAME=tutorial
 
+python example.py
+
 
 
 # If the database is PostgreSQL, use the following commands
