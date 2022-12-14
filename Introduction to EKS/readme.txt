@@ -18,7 +18,7 @@ curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/d
 sudo mv -v /tmp/eksctl /usr/local/bin
 eksctl version
 
-eksctl create cluster --version=1.24 --name=eksspottutorial --nodes=2 --managed --region=us-east-1 --node-type t2.micro --asg-access
+eksctl create cluster --version=1.24 --name=eks-demo --nodes=2 --managed --region=us-east-1 --node-type t2.micro --asg-access
 
 
 # Create Container Image
@@ -50,4 +50,5 @@ kubectl apply -f game-2048.yaml
 kubectl port-forward service/service-2048 8080:80 -n game-2048
 
 # Delete EKS Cluster
+eksctl delete cluster --name eks-demo --region us-east-1
 eksctl delete cluster -f eks-demo-cluster.yaml 
