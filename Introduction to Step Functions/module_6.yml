@@ -1,0 +1,79 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  HelloFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: HelloFunction
+      Handler: index.handler
+      Role:
+        Fn::GetAtt:
+          - HelloFunctionRole
+          - Arn
+      Code:
+        ZipFile:
+          "/** \n\nMIT No Attribution \n\nCopyright 2021 Amazon Web Services
+          \n\nPermission is hereby granted, free of charge, to any person obtaining
+          a copy of this software and associated documentation files (the \"Software\"),
+          to deal in the Software without restriction, including without limitation
+          the rights to use, copy, modify, merge, publish, distribute, sublicense,
+          and/or sell copies of the Software, and to permit persons to whom the Software
+          is furnished to do so. \n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY
+          OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+          OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+          IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+          DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+          ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+          DEALINGS IN THE SOFTWARE. \n\n*/\n\nexports.handler = (event, context, callback)
+          => {\n callback(null, \"Hello, \" + event.who + \"!\");\n};"
+      Runtime: nodejs12.x
+      Timeout: 300
+  HelloFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: HelloFunctionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: '/'
+      Policies:
+        - PolicyName: AWSLambdaBasicExecutionRole
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+  InputOutputProcessingStepFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: InputOutputProcessingStepFunctionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - states.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: '/'
+      Policies:
+        - PolicyName: StepFunctionIOProcessingRole
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource:
+                  - '*'

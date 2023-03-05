@@ -1,0 +1,236 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  ParallelState-APIGW
+
+  Sample CloudFormation Template for ParallelState and APIGW integration
+
+Resources:
+  StartExecutionAPI:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Body:
+        info:
+          version: 1.0.0
+          title: API Gateway State Machine integration
+        x-amazon-apigateway-policy:
+          Version: '2012-10-17'
+          Statement:
+            - Action: execute-api:Invoke
+              Resource:
+                - execute-api:/*/*/*
+              Effect: Allow
+              Principal: '*'
+        openapi: 3.0.3
+        paths:
+          '/execution':
+            post:
+              x-amazon-apigateway-integration:
+                type: mock
+              summary: Example API Endpoint
+              responses:
+                '200':
+                  description: Success
+              operationId: example
+  StartExecutionAPIDeployment:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      Description: 'RestApi deployment'
+      RestApiId:
+        Ref: StartExecutionAPI
+      StageName: Stage
+  StartExecutionAPIprodStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId:
+        Ref: StartExecutionAPIDeployment
+      RestApiId:
+        Ref: StartExecutionAPI
+      StageName: prod
+
+  SumFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: SumFunction
+      Role: !GetAtt M7LambdaRole.Arn
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Code:
+        ZipFile: |
+          # -----------------------------------------------------------
+          #    MIT No Attribution
+          #    
+          #    Copyright 2022 Amazon Web Services
+          #    
+          #    Permission is hereby granted, free of charge, to any person obtaining a copy of this
+          #    software and associated documentation files (the "Software"), to deal in the Software
+          #    without restriction, including without limitation the rights to use, copy, modify,
+          #    merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+          #    permit persons to whom the Software is furnished to do so.
+          #    
+          #    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+          #    INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+          #    PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+          #    HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+          #    OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+          #    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+          # -----------------------------------------------------------
+
+          import json
+
+          def lambda_handler(event, context):
+            print(event)
+            return {
+                "sum": sum(event['data'])
+            }
+
+  AvgFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: AvgFunction
+      Role: !GetAtt M7LambdaRole.Arn
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Code:
+        ZipFile: |
+          # -----------------------------------------------------------
+          #    MIT No Attribution
+          #    
+          #    Copyright 2022 Amazon Web Services
+          #    
+          #    Permission is hereby granted, free of charge, to any person obtaining a copy of this
+          #    software and associated documentation files (the "Software"), to deal in the Software
+          #    without restriction, including without limitation the rights to use, copy, modify,
+          #    merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+          #    permit persons to whom the Software is furnished to do so.
+          #    
+          #    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+          #    INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+          #    PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+          #    HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+          #    OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+          #    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+          # -----------------------------------------------------------
+
+          import json
+
+          def lambda_handler(event, context):
+
+            return {
+                "avg": sum(event['data']) / len(event['data'])
+            }
+
+  MaxMinFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: MaxMinFunction
+      Role: !GetAtt M7LambdaRole.Arn
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Code:
+        ZipFile: |
+          # -----------------------------------------------------------
+          #    MIT No Attribution
+          #    
+          #    Copyright 2022 Amazon Web Services
+          #    
+          #    Permission is hereby granted, free of charge, to any person obtaining a copy of this
+          #    software and associated documentation files (the "Software"), to deal in the Software
+          #    without restriction, including without limitation the rights to use, copy, modify,
+          #    merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+          #    permit persons to whom the Software is furnished to do so.
+          #    
+          #    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+          #    INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+          #    PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+          #    HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+          #    OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+          #    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+          # -----------------------------------------------------------
+
+          import json
+
+          def lambda_handler(event, context):
+
+            return {
+                "max": max(event['data']),
+                "min": min(event['data'])
+            }
+
+  M7LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: M7LambdaRole
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: '/'
+      Policies:
+        - PolicyName: AWSLambdaBasicExecutionRole
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+
+  IntegrationIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - apigateway.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess
+
+  StepFunctionsIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - states.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: StepFunctionsIamRoleInvokeLambda
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: 'lambda:InvokeFunction'
+                Resource: '*'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
+        - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+
+Outputs:
+  StartExecutionAPI:
+    Description: 'API Gateway endpoint URL for Prod stage for integration to Step Functions'
+    Value: !Sub 'https://${StartExecutionAPI}.execute-api.${AWS::Region}.amazonaws.com/prod/'
+  SumFunction:
+    Description: 'ARN of the Lamda Function to calculate the sum of the data points'
+    Value: !GetAtt SumFunction.Arn
+  AvgFunction:
+    Description: 'ARN of the Lamda Function to calculate the Average of the data points'
+    Value: !GetAtt AvgFunction.Arn
+  MaxMinFunction:
+    Description: 'ARN of the Lamda Function to calculate the Max and Min values'
+    Value: !GetAtt MaxMinFunction.Arn
+  IntegrationIamRole:
+    Description: 'IAM Role to be used in the integration between API Gateway and Step Functions'
+    Value: !GetAtt IntegrationIamRole.Arn

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<body>
+<h2>CodeGuru Reviewer Recommendations</h2>
+<p><strong>CodeGuru Repository ARN</strong>: <a href="https://console.aws.amazon.com/codeguru/reviewer?region=us-east-1#/ciworkflows/associationdetails/arn:aws:codeguru-reviewer:us-east-1:071908484098:association:f23320f2-704c-4eb7-bf31-e2589844c427">arn:aws:codeguru-reviewer:us-east-1:071908484098:association:f23320f2-704c-4eb7-bf31-e2589844c427</a></p>
+<p><strong>CodeGuru Scan ARN</strong>: <a href="https://console.aws.amazon.com/codeguru/reviewer?region=us-east-1#/codereviews/details/arn:aws:codeguru-reviewer:us-east-1:071908484098:association:f23320f2-704c-4eb7-bf31-e2589844c427:code-review:RepositoryAnalysis-codeguru-reviewer-cli-063427a1-b515-4470-a27c-756d7f2b759b">arn:aws:codeguru-reviewer:us-east-1:071908484098:association:f23320f2-704c-4eb7-bf31-e2589844c427:code-review:RepositoryAnalysis-codeguru-reviewer-cli-063427a1-b515-4470-a27c-756d7f2b759b</a></p>
+
+<br/><hr style="width:90%"><br/>
+<h3>In: <a href="file:///home/ec2-user/SageMaker/amazon-codewhisperer-workshop/python/integration/runtime/send_email.py">/home/ec2-user/SageMaker/amazon-codewhisperer-workshop/python/integration/runtime/send_email.py</a> L1</h3>
+<p><strong>Issue:</strong> Using Element to parse untrusted XML data is known to be vulnerable to XML attacks. Replace Element with the equivalent defusedxml package, or make sure defusedxml.defuse_stdlib() is called. https://bandit.readthedocs.io/en/latest/blacklists/blacklist_imports.html#b405-import-xml-etree</p>
+<p><strong>Severity:</strong> High<p/><p><strong>Rule ID:</strong> python/not-recommended-apis@v1.0<p/><p><strong>Rule Name:</strong> Usage of an API that is not recommended<p/><p><strong>Description:</strong> APIs that are not recommended were found. This could indicate a deeper problem in the code.</p>
+<p><strong>Tags:</strong></p>
+<ul>
+<li>security</li>
+<li>security-context</li>
+<li>python</li>
+<li>bandit-1.6</li>
+</ul>
+
+<hr style="width:80%">
+<h3>In: <a href="file:///home/ec2-user/SageMaker/amazon-codewhisperer-workshop/python/integration/runtime/send_email_solution.py">/home/ec2-user/SageMaker/amazon-codewhisperer-workshop/python/integration/runtime/send_email_solution.py</a> L1</h3>
+<p><strong>Issue:</strong> Using Element to parse untrusted XML data is known to be vulnerable to XML attacks. Replace Element with the equivalent defusedxml package, or make sure defusedxml.defuse_stdlib() is called. https://bandit.readthedocs.io/en/latest/blacklists/blacklist_imports.html#b405-import-xml-etree</p>
+<p><strong>Severity:</strong> High<p/><p><strong>Rule ID:</strong> python/not-recommended-apis@v1.0<p/><p><strong>Rule Name:</strong> Usage of an API that is not recommended<p/><p><strong>Description:</strong> APIs that are not recommended were found. This could indicate a deeper problem in the code.</p>
+<p><strong>Tags:</strong></p>
+<ul>
+<li>security</li>
+<li>security-context</li>
+<li>python</li>
+<li>bandit-1.6</li>
+</ul>
+
+<hr style="width:80%">
+<h3>In: <a href="file:///home/ec2-user/SageMaker/amazon-codewhisperer-workshop/python/recognition/runtime/list_images_solution.py">/home/ec2-user/SageMaker/amazon-codewhisperer-workshop/python/recognition/runtime/list_images_solution.py</a> L11</h3>
+<p><strong>Issue:</strong> The API method <code>scan</code> returns paginated results instead of all results. Consider using the pagination API or checking one of the following keys in the response to verify that all results were returned: <code>ExclusiveStartKey</code>, <code>IsTruncated</code>, <code>LastEvaluatedKey</code>, <code>NextToken</code>.</p>
+<p><a href="https://boto3.amazonaws.com/v1/documentation/api/latest/guide/paginators.html">Learn more</a></p>
+<p><strong>Severity:</strong> High<p/><p><strong>Rule ID:</strong> python/missing-pagination@v1.0<p/><p><strong>Rule Name:</strong> Missing pagination<p/><p><strong>Description:</strong> Missing pagination on a paginated call can lead to inaccurate results. One must paginate to ensure additional results are not present, before returning the results.</p>
+<p><strong>Tags:</strong></p>
+<ul>
+<li>aws-python-sdk</li>
+<li>data-integrity</li>
+<li>security</li>
+<li>security-context</li>
+<li>python</li>
+</ul>
+
+<hr style="width:80%">
+</body>
+</html>

@@ -1,0 +1,43 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS Step Functions sample project for scheduling a task
+
+Resources:
+  StatesExecutionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service: states.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Path: '/'
+
+  TimerStateMachine:
+    Type: 'AWS::StepFunctions::StateMachine'
+    Properties:
+      DefinitionString: |-
+        {
+          "Comment": "An example of the Amazon States Language for scheduling a task.",
+          "StartAt": "Wait for Timer",
+          "States": {
+            "Wait for Timer": {
+              "Type": "Wait",
+              "SecondsPath": "$.timer_seconds",
+              "Next": "Success"
+            },
+            "Success": {
+              "Type": "Succeed"
+            }
+          }
+        }
+      RoleArn: !GetAtt [StatesExecutionRole, Arn]
+
+Outputs:
+  StateMachineArn:
+    Value:
+      Ref: TimerStateMachine
+  ExecutionInput:
+    Description: Sample input to StartExecution.
+    Value: '{ "timer_seconds": 10 }'

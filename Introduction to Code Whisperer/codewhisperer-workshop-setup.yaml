@@ -1,0 +1,305 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: This is an example template describes an Basic SageMaker Amazon NoteBook 
+  Instance with sample scripts to install code-server and aws-toolkit-vscode extension.
+  (c) 2022 Amazon Web Services, Inc. or its affiliates. All Rights Reserved. This
+  AWS Content is provided subject to the terms of the AWS Customer Agreement available
+  at http://aws.amazon.com/agreement or other written agreement between Customer and
+  Amazon Web Services, Inc.
+Resources:
+  BasicNotebookInstance:
+    Type: "AWS::SageMaker::NotebookInstance"
+    Properties:
+      InstanceType: "ml.t3.medium"
+      # DefaultCodeRepository: "CWCodeRepo"
+      LifecycleConfigName: !GetAtt BasicNotebookInstanceLifecycleConfig.NotebookInstanceLifecycleConfigName
+      NotebookInstanceName: "cwnotebook"
+      PlatformIdentifier: "notebook-al2-v1"
+      RoleArn: !GetAtt ExecutionRole.Arn
+  # CodeRepository:
+  #   Type: AWS::SageMaker::CodeRepository
+  #   Properties:
+  #     CodeRepositoryName: CWCodeRepo
+  #     GitConfig:
+  #       Branch: "main"
+  #       RepositoryUrl: "https://github.com/aws-samples/amazon-codewhisperer-workshop.git"
+  BasicNotebookInstanceLifecycleConfig:
+    Type: "AWS::SageMaker::NotebookInstanceLifecycleConfig"
+    Properties:
+      OnCreate:
+        - Content:
+            Fn::Base64: |
+                        # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+                        # SPDX-License-Identifier: MIT-0
+
+                        #!/bin/bash
+                        set -eux
+
+                        ###############
+                        #  VARIABLES  #
+                        ###############
+
+                        CODE_SERVER_VERSION="4.5.2"
+                        CODE_SERVER_INSTALL_LOC="/home/ec2-user/SageMaker/.cs"
+                        XDG_DATA_HOME="/home/ec2-user/SageMaker/.xdg/data"
+                        XDG_CONFIG_HOME="/home/ec2-user/SageMaker/.xdg/config"
+                        INSTALL_PYTHON_EXTENSION=1
+                        CREATE_NEW_CONDA_ENV=1
+                        CONDA_ENV_LOCATION='/home/ec2-user/SageMaker/.cs/conda/envs/codeserver_py39'
+                        CONDA_ENV_PYTHON_VERSION="3.9"
+                        INSTALL_DOCKER_EXTENSION=1
+                        USE_CUSTOM_EXTENSION_GALLERY=0
+                        NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+
+                        sudo -u ec2-user -i <<EOF
+
+                        unset SUDO_UID
+
+                        #############
+                        #  INSTALL  #
+                        #############
+
+                        # set the data and config home env variable for code-server
+                        export XDG_DATA_HOME=$XDG_DATA_HOME
+                        export XDG_CONFIG_HOME=$XDG_CONFIG_HOME
+                        export PATH="$CODE_SERVER_INSTALL_LOC/bin/:$PATH"
+                        export NVM_DIR=$NVM_DIR
+
+                        # install code-server standalone
+                        mkdir -p ${CODE_SERVER_INSTALL_LOC}/lib ${CODE_SERVER_INSTALL_LOC}/bin
+                        curl -fL https://github.com/coder/code-server/releases/download/v$CODE_SERVER_VERSION/code-server-$CODE_SERVER_VERSION-linux-amd64.tar.gz \
+                        | tar -C ${CODE_SERVER_INSTALL_LOC}/lib -xz
+                        mv ${CODE_SERVER_INSTALL_LOC}/lib/code-server-$CODE_SERVER_VERSION-linux-amd64 ${CODE_SERVER_INSTALL_LOC}/lib/code-server-$CODE_SERVER_VERSION
+                        ln -s ${CODE_SERVER_INSTALL_LOC}/lib/code-server-$CODE_SERVER_VERSION/bin/code-server ${CODE_SERVER_INSTALL_LOC}/bin/code-server
+
+                        # create separate conda environment
+                        if [ $CREATE_NEW_CONDA_ENV -eq 1 ]
+                        then
+                            conda create --prefix $CONDA_ENV_LOCATION python=$CONDA_ENV_PYTHON_VERSION -y
+                        fi
+
+                        # install ms-python extension
+                        if [ $USE_CUSTOM_EXTENSION_GALLERY -eq 0 -a $INSTALL_PYTHON_EXTENSION -eq 1 ]
+                        then
+                            code-server --install-extension ms-python.python --force
+
+                            # if the new conda env was created, add configuration to set as default
+                            if [ $CREATE_NEW_CONDA_ENV -eq 1 ]
+                            then
+                                CODE_SERVER_MACHINE_SETTINGS_FILE="$XDG_DATA_HOME/code-server/Machine/settings.json"
+                                if grep -q "python.defaultInterpreterPath" "\$CODE_SERVER_MACHINE_SETTINGS_FILE"
+                                then
+                                    echo "Default interepreter path is already set."
+                                else
+                                    cat >>\$CODE_SERVER_MACHINE_SETTINGS_FILE <<- MACHINESETTINGS
+                        {
+                            "python.defaultInterpreterPath": "$CONDA_ENV_LOCATION/bin"
+                        }
+                        MACHINESETTINGS
+                                fi
+                            fi
+                        fi
+
+                        # install docker extension
+                        if [ $USE_CUSTOM_EXTENSION_GALLERY -eq 0 -a $INSTALL_DOCKER_EXTENSION -eq 1 ]
+                        then
+                            code-server --install-extension ms-azuretools.vscode-docker --force
+                        fi
+
+                        code-server --install-extension amazonwebservices.aws-toolkit-vscode
+
+                        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.2/install.sh | bash
+
+                        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" # This loads nvm
+
+                        nvm install 16.17.1
+                        npm install -g aws-cdk
+
+                        EOF
+
+      OnStart:
+        - Content:
+            Fn::Base64: |
+                        # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+                        # SPDX-License-Identifier: MIT-0
+
+                        #!/bin/bash
+                        set -eux
+
+                        ###############
+                        #  VARIABLES  #
+                        ###############
+
+                        CODE_SERVER_VERSION="4.5.2"
+                        CODE_SERVER_INSTALL_LOC="/home/ec2-user/SageMaker/.cs"
+                        XDG_DATA_HOME="/home/ec2-user/SageMaker/.xdg/data"
+                        XDG_CONFIG_HOME="/home/ec2-user/SageMaker/.xdg/config"
+                        CREATE_NEW_CONDA_ENV=1
+                        CONDA_ENV_LOCATION='/home/ec2-user/SageMaker/.cs/conda/envs/codeserver_py39'
+                        USE_CUSTOM_EXTENSION_GALLERY=0
+                        EXTENSION_GALLERY_CONFIG='{{\"serviceUrl\":\"\",\"cacheUrl\":\"\",\"itemUrl\":\"\",\"controlUrl\":\"\",\"recommendationsUrl\":\"\"}}'
+
+                        LAUNCHER_ENTRY_TITLE='Code Server'
+                        PROXY_PATH='codeserver'
+                        LAB_3_EXTENSION_DOWNLOAD_URL='https://github.com/aws-samples/amazon-sagemaker-codeserver/releases/download/v0.1.5/sagemaker-jproxy-launcher-ext-0.1.3.tar.gz'
+                        INSTALL_LAB1_EXTENSION=1
+                        LAB_1_EXTENSION_DOWNLOAD_URL='https://github.com/aws-samples/amazon-sagemaker-codeserver/releases/download/v0.1.5/amzn-sagemaker-jproxy-launcher-ext-jl1-0.1.4.tgz'
+
+                        #############
+                        #  INSTALL  #
+                        #############
+
+                        export XDG_DATA_HOME=$XDG_DATA_HOME
+                        export XDG_CONFIG_HOME=$XDG_CONFIG_HOME
+                        export PATH="${CODE_SERVER_INSTALL_LOC}/bin/:$PATH"
+
+                        # use custom extension gallery
+                        EXT_GALLERY_JSON=''
+                        if [ $USE_CUSTOM_EXTENSION_GALLERY -eq 1 ]
+                        then
+                            EXT_GALLERY_JSON="'EXTENSIONS_GALLERY': '$EXTENSION_GALLERY_CONFIG'"
+                        fi
+
+                        JUPYTER_CONFIG_FILE="/home/ec2-user/.jupyter/jupyter_notebook_config.py"
+                        if grep -q "$CODE_SERVER_INSTALL_LOC/bin" "$JUPYTER_CONFIG_FILE"
+                        then
+                            echo "Server-proxy configuration already set in Jupyter notebook config."
+                        else
+                            cat >>/home/ec2-user/.jupyter/jupyter_notebook_config.py <<EOC
+                        c.ServerProxy.servers = {
+                          '$PROXY_PATH': {
+                              'launcher_entry': {
+                                    'enabled': True,
+                                    'title': '$LAUNCHER_ENTRY_TITLE',
+                                    'icon_path': 'codeserver.svg'
+                              },
+                              'command': ['$CODE_SERVER_INSTALL_LOC/bin/code-server', '--auth', 'none', '--disable-telemetry', '--bind-addr', '127.0.0.1:{port}'],
+                              'environment' : {
+                                                'XDG_DATA_HOME' : '$XDG_DATA_HOME',
+                                                'XDG_CONFIG_HOME': '$XDG_CONFIG_HOME',
+                                                'SHELL': '/bin/bash',
+                                                $EXT_GALLERY_JSON
+                                              },
+                              'absolute_url': False,
+                              'timeout': 30
+                          }
+                        }
+                        EOC
+                        fi
+
+                        JUPYTER_LAB_VERSION=$(/home/ec2-user/anaconda3/envs/JupyterSystemEnv/bin/jupyter-lab --version)
+
+                        sudo -u ec2-user -i <<EOF
+
+                        if [ $CREATE_NEW_CONDA_ENV -eq 1 ]
+                        then
+                            conda config --add envs_dirs "${CONDA_ENV_LOCATION%/*}"
+                        fi
+
+                        if [[ $JUPYTER_LAB_VERSION == 1* ]]
+                        then
+                            source /home/ec2-user/anaconda3/bin/activate JupyterSystemEnv
+                            pip install jupyter-server-proxy
+                            conda deactivate
+
+                            if [ $INSTALL_LAB1_EXTENSION -eq 1 ]
+                            then
+                                rm -f $CODE_SERVER_INSTALL_LOC/install-jl1-extension.sh
+                                cat >>$CODE_SERVER_INSTALL_LOC/install-jl1-extension.sh <<- JL1EXT
+                        sleep 15
+
+                        source /home/ec2-user/anaconda3/bin/activate JupyterSystemEnv
+
+                        mkdir -p $CODE_SERVER_INSTALL_LOC/lab_ext
+                        curl -L $LAB_1_EXTENSION_DOWNLOAD_URL > $CODE_SERVER_INSTALL_LOC/lab_ext/amzn-sagemaker-jproxy-launcher-ext-jl1.tgz
+
+                        cd $CODE_SERVER_INSTALL_LOC/lab_ext
+                        jupyter labextension install amzn-sagemaker-jproxy-launcher-ext-jl1.tgz --no-build
+                        jlpm config set cache-folder /tmp/yarncache
+                        jupyter lab build --debug --minimize=False
+
+                        conda deactivate
+
+                        JL1EXT
+                                chmod +x $CODE_SERVER_INSTALL_LOC/install-jl1-extension.sh
+                                sh $CODE_SERVER_INSTALL_LOC/install-jl1-extension.sh
+                            fi
+                        else
+                            source /home/ec2-user/anaconda3/bin/activate JupyterSystemEnv
+
+                            # Install JL3 extension
+                            mkdir -p $CODE_SERVER_INSTALL_LOC/lab_ext
+                            curl -L $LAB_3_EXTENSION_DOWNLOAD_URL > $CODE_SERVER_INSTALL_LOC/lab_ext/sagemaker-jproxy-launcher-ext.tar.gz
+                            pip install $CODE_SERVER_INSTALL_LOC/lab_ext/sagemaker-jproxy-launcher-ext.tar.gz
+
+                            jupyter labextension disable jupyterlab-server-proxy
+
+                            conda deactivate
+                        fi
+                        
+                        source /home/ec2-user/anaconda3/bin/activate codeserver_py39
+                        cd /home/ec2-user/SageMaker/
+                        git clone https://github.com/aws-samples/amazon-codewhisperer-workshop.git
+                        ls
+                        cd /home/ec2-user/SageMaker/amazon-codewhisperer-workshop/python/
+                        ls
+                        pip install -r requirements.txt
+                        cdk bootstrap
+                        cdk deploy --all --require-approval never
+
+                        conda deactivate
+
+                        EOF
+
+                        systemctl restart jupyter-server
+
+
+
+
+  ExecutionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "sagemaker.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonSageMakerFullAccess"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AWSCloudFormationFullAccess"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/IAMFullAccess"
+      Policies:
+      - PolicyName: AllowAssumeCDKBootstrapRole
+        PolicyDocument: 
+            Version: '2012-10-17'
+            Statement:
+              - Effect: "Allow"
+                Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role/cdk*"
+                Action:
+                  - "sts:AssumeRole"
+      - PolicyName: AllowServiceDeploy
+        PolicyDocument: 
+            Version: '2012-10-17'
+            Statement:
+              - Effect: "Allow"
+                Resource: "*"
+                Action:
+                  - "sns:*"
+                  - "apigateway:*"
+                  - "s3:*"
+                  - "lambda:*"
+                  - "sagemaker:*"
+                  - "dynamodb:*"
+                  - "rekognition:*"
+                  - "sqs:*"
+                  - "ssm:*"
+                  - "ecs:*"
+                  - "ecr:*"
+                  - "codeguru-reviewer:*"
+                  - "codeguru:*"
+                  - "codeguru-profiler:*"

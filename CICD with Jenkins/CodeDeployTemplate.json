@@ -1,0 +1,774 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+  "Description" : "Jenkins CodeDeploy: This template creates the CodeBuild project,  IAM Roles, Jenkins server with pre-installed jinkens plugins and CodeDeploy instances to deploy the application on. **WARNING** This template creates one or more Amazon EC2 instances. You will be billed for the AWS resources used if you create a stack from this template. Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved. SPDX-License-Identifier: MIT-0",
+  "Parameters" : {
+    "CodedeployInstanceType": {
+      "Description": "EC2 instance type for  CodeDeploy Web Servers",
+      "Type": "String",
+      "Default": "t2.medium",
+      "AllowedValues": ["t1.micro", "t2.micro", "t2.small", "t2.medium", "m3.medium", "m3.large", "m3.xlarge", "m3.2xlarge", "c3.large", "c3.xlarge", "c3.2xlarge", "c3.4xlarge", "c3.8xlarge", "c4.large", "c4.xlarge", "c4.2xlarge", "c4.4xlarge", "c4.8xlarge", "r3.large", "r3.xlarge", "r3.2xlarge", "r3.4xlarge", "r3.8xlarge", "i2.xlarge", "i2.2xlarge", "i2.4xlarge", "i2.8xlarge", "hi1.4xlarge", "hs1.8xlarge", "cr1.8xlarge", "cc2.8xlarge"],
+      "ConstraintDescription": "must be a valid EC2 instance type."
+    },
+    "JenkinsInstanceType": {
+      "Description": "EC2 instance type for  Jenkins Server",
+      "Type": "String",
+      "Default": "t2.medium",
+      "AllowedValues": ["t1.micro", "t2.micro", "t2.small", "t2.medium", "m3.medium", "m3.large", "m3.xlarge", "m3.2xlarge", "c3.large", "c3.xlarge", "c3.2xlarge", "c3.4xlarge", "c3.8xlarge", "c4.large", "c4.xlarge", "c4.2xlarge", "c4.4xlarge", "c4.8xlarge", "r3.large", "r3.xlarge", "r3.2xlarge", "r3.4xlarge", "r3.8xlarge", "i2.xlarge", "i2.2xlarge", "i2.4xlarge", "i2.8xlarge", "hi1.4xlarge", "hs1.8xlarge", "cr1.8xlarge", "cc2.8xlarge"],
+      "ConstraintDescription": "must be a valid EC2 instance type."
+    },
+    "InstanceCount" : {
+      "Description" : "Number of CodeDeploy Web Server EC2 instances",
+      "Type" : "Number",
+      "Default" : "3",
+      "ConstraintDescription" : "Must be a number between 2 and 4.",
+      "MinValue" : "2",
+      "MaxValue" : "4"
+    },
+    "KeyName": {
+      "Description": "The EC2 Key Pair to allow SSH access to CodeDeploy EC2 instances and Jenkins Server",
+      "Type": "AWS::EC2::KeyPair::KeyName",
+      "ConstraintDescription": "must be the name of an existing EC2 KeyPair."
+    },
+    "VpcId": {
+      "Description": "The VPC Id where the EC2 instances will be launched.",
+      "Type": "AWS::EC2::VPC::Id",
+      "ConstraintDescription": "must be the name of an existing VPC."
+    },
+    "YourIPRange": {
+      "Description": "CIDR block of the network from where you will connect to the Jenkins server using HTTP and SSH",
+      "Type": "String",
+      "MinLength": "9",
+      "MaxLength": "18",
+      "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+      "ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x."
+    },
+    "PublicSubnet1": {
+      "Description": "The first public subnet where the Jenkins EC2 instance, ELB and CodeDeploy Web Servers will be launched",
+      "Type": "AWS::EC2::Subnet::Id",
+      "ConstraintDescription": "Must be a valid Public VPC Subnet."
+    },
+    "PublicSubnet2": {
+      "Description": "The second public subnet where the ELB and CodeDeploy Web Servers will be launched",
+      "Type": "AWS::EC2::Subnet::Id",
+      "ConstraintDescription": "Must be a valid Public VPC Subnet."
+    },
+     "CodeBuildProject" : {
+                   "Type" : "String",
+                   "Description" : "Enter the project name of the CodeBuild"
+                 }
+     },
+  
+  "Mappings": {
+    "AWSRegionArch2AMI": {
+      "ap-northeast-1"  : {  "AMI" : "ami-08847abae18baa040" },
+      "ap-northeast-2"  : { "AMI" : "ami-012566705322e9a8e" },
+      "ap-south-1"        : { "AMI" : "ami-00b6a8a2bd28daf19" },
+      "ap-southeast-1"  : { "AMI" : "ami-01da99628f381e50a" },
+      "ap-southeast-2"    : { "AMI" : "ami-00e17d1165b9dd3ec" },
+      "eu-central-1"  : { "AMI" : "ami-076431be05aaf8080" },
+      "eu-west-1"  : { "AMI" : "ami-0bdb1d6c15a40392c" },
+      "eu-west-2"  : { "AMI" : "ami-e1768386" },
+      "eu-west-3"   : { "AMI" : "ami-06340c8c12baa6a09" },
+      "sa-east-1"  : { "AMI" : "ami-0ad7b0031d41ed4b9" },
+      "us-east-1"  : { "AMI" :  "ami-04681a1dbd79675a5" },
+      "us-east-2"   : { "AMI" : "ami-0cf31d971a3ca20d6" },
+      "us-west-1"  : { "AMI" : "ami-0782017a917e973e7" },
+      "us-west-2"  : { "AMI" : "ami-6cd6f714" }
+    }
+  },
+
+  "Resources": {
+
+      "CodeBuildRole" : {
+                          "Type" : "AWS::IAM::Role",
+                          "Properties" : {
+                            "AssumeRolePolicyDocument" : {
+                              "Statement" : [ {
+                                "Effect" : "Allow",
+                                "Principal" : {
+                                  "Service" : [ "codebuild.amazonaws.com" ]
+                                },
+                                "Action" : [ "sts:AssumeRole" ]
+                              } ]
+                            },
+                            "Path" : "/"
+                          }
+                        },
+
+      "CodeBuildRolePolicies" : {
+                        "Type" : "AWS::IAM::Policy",
+                        "Properties" : {
+                          "PolicyName" : "CodeBuildRole",
+                          "PolicyDocument" : {
+                            "Statement" : [ {
+                              "Effect" : "Allow",
+                              "Action" : [ "logs:CreateLogGroup","logs:CreateLogStream","logs:PutLogEvents", "s3:GetObject","s3:GetObjectVersion","s3:PutObject" ],
+                              "Resource" : "*"
+                            } ]
+                          },
+                          "Roles" : [ {
+                            "Ref" : "CodeBuildRole"
+                          } ]
+                        }
+                      },
+
+      "CodBuildProject": {
+                "Type": "AWS::CodeBuild::Project",
+                "Properties": {
+                  "Name": { "Ref": "CodeBuildProject"},
+                  "Description": "A description about my project",
+                  "ServiceRole": { "Fn::GetAtt": [ "CodeBuildRole", "Arn" ] },
+                  "Artifacts": {
+                         "EncryptionDisabled" : true,
+                         "Location" : { "Ref" : "CodeDeployBucket" },
+                         "Name" : "codebuild-artifact.zip",
+                         "Packaging" : "ZIP",
+                         "Type" : "S3"
+                       },
+                  "Environment": {
+                    "Type": "LINUX_CONTAINER",
+                    "ComputeType": "BUILD_GENERAL1_SMALL",
+                    "Image": "aws/codebuild/standard:6.0"                  
+                  },
+                  "Source": {
+                            "Location" : {"Fn::Join" : [ "", [ {"Ref": "CodeDeployBucket"}, "/test" ] ]},
+                            "Type" : "S3"
+                          }
+                 }
+            },
+
+    "JenkinsServer": {
+      "Type": "AWS::EC2::Instance",
+      "Metadata": {
+                "Comment": "Install Jenkins, nginx and the Jenkins CodeDeploy plugin",
+                "AWS::CloudFormation::Init": {
+                    "configSets": {
+                        "install_all": [
+                            "install_base",
+                            "install_nginx"
+                        ]
+                    },
+                    "install_base": {
+                        "packages": {
+                            "yum": {
+                                "git": []
+                            }
+                        }
+                    },
+                    "install_nginx": {
+                        "packages": {
+                            "yum": {
+                                "nginx": []
+                            }
+                        },
+                        "files": {
+                            "/etc/nginx/nginx.conf": {
+                                "content": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "user  nginx;\n",
+                                            "worker_processes  1;\n\n",
+                                            "error_log  /var/log/nginx/error.log;\n",
+                                            "pid        /var/run/nginx.pid;\n\n",
+                                            "events {\n",
+                                            "    worker_connections  1024;\n",
+                                            "}\n\n",
+                                            "http {\n",
+                                            "    include       /etc/nginx/mime.types;\n",
+                                            "    default_type  application/octet-stream;\n",
+                                            "    log_format  main  '$remote_addr - $remote_user [$time_local] \"$request\" '\n",
+                                            "                      '$status $body_bytes_sent \"$http_referer\" '\n",
+                                            "                      '\"$http_user_agent\" \"$http_x_forwarded_for\"';\n\n",
+                                            "    access_log  /var/log/nginx/access.log  main;\n",
+                                            "    sendfile        on;\n",
+                                            "    keepalive_timeout  65;\n",
+                                            "    include /etc/nginx/conf.d/*.conf;\n",
+                                            "    index   index.html index.htm;\n",
+                                            "    server {\n",
+                                            "        listen       80;\n",
+                                            "        server_name  _;\n",
+                                            "        location / {\n",
+                                            "          proxy_pass              http://127.0.0.1:8080;\n",
+                                            "          proxy_set_header        Host $host;\n",
+                                            "          proxy_set_header        X-Real-IP $remote_addr;\n",
+                                            "          proxy_set_header        X-Forwarded-For $proxy_add_x_forwarded_for;\n",
+                                            "          proxy_connect_timeout   150;\n",
+                                            "          proxy_send_timeout      100;\n",
+                                            "          proxy_read_timeout      100;\n",
+                                            "          proxy_buffers           4 32k;\n",
+                                            "          client_max_body_size    8m;\n",
+                                            "          client_body_buffer_size 128k;\n",
+                                            "        }\n",
+                                            "        location /password.txt {\n",
+                                            "          alias              /web/initalpass.html;\n",
+                                            "        }\n",
+                                            "   }\n",
+                                            "}\n"
+                                        ]
+                                    ]
+                                }
+                            }
+                        },
+                        "mode": "000444",
+                        "owner": "root",
+                        "group": "root"
+                    }
+                },
+                "services": {
+                    "sysvinit": {
+                        "nginx": {
+                            "enabled": "true",
+                            "ensureRunning": "true",
+                            "files": [
+                                "/etc/nginx/nginx.conf"
+                            ]
+                        }
+                    }
+                }
+            },
+      "Properties": {
+        "KeyName": {
+          "Ref": "KeyName"
+        },
+        "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" }, "AMI"]},
+        "NetworkInterfaces": [ {
+          "AssociatePublicIpAddress": "true",
+          "DeviceIndex": "0",
+          "GroupSet": [{ "Ref" : "JenkinsSecurityGroup" }],
+          "SubnetId": { "Ref" : "PublicSubnet1" }
+        } ],
+        "InstanceType": {
+          "Ref": "JenkinsInstanceType"
+        },
+        "IamInstanceProfile": {
+          "Ref": "JenkinsInstanceProfile"
+        },
+        "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "", [
+                                "#!/bin/bash -xe\n",   
+                                "amazon-linux-extras install epel\n",
+                                "sudo yum install -y aws-cfn-bootstrap\n",                  
+                                "sudo mkdir /web\n",                  
+                                "/opt/aws/bin/cfn-init -v ",
+                                " --stack ", {
+                                  "Ref": "AWS::StackName"
+                                },
+                                " --resource JenkinsServer ",
+                                " --configsets install_all ",
+                                " --region ", {
+                                  "Ref": "AWS::Region"
+                                }, "\n",
+
+                                "# Install Jenkins and Java11\n",
+                                "sudo yum install wget -y\n",
+                                "sudo wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo\n",
+                                "sudo rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io.key\n",
+                                "sudo yum install java-11-openjdk -y\n",
+                                "sudo yum update -y\n",
+                                "sudo yum install jenkins -y\n",        
+
+                                "sudo service jenkins start\n",
+                                "sudo chkconfig jenkins on\n",        
+
+                                "# Update the AWS CLI to the latest version\n",
+                                "sudo yum update -y aws-cli\n",        
+
+                                "# Wait 30 seconds to allow Jenkins to startup\n",
+                                "echo \"Waiting 30 seconds for Jenkins to start.....\"\n",
+                                "sleep 30\n",                  
+           
+                                "## Nginx setup\n",
+                                "service nginx restart\n",   
+
+                                "# Restart Jenkins Service\n",
+                                "/etc/init.d/jenkins restart\n",
+
+                                "#Restart NGINX service\n",
+                                "sudo service nginx restart\n",
+                                
+                              "sleep 90\n",
+                               "cp /var/lib/jenkins/secrets/initialAdminPassword /web/initalpass.html \n",
+                               "chown nginx:nginx /web/initalpass.html \n",
+
+                              "# Configure AWS CLI and GIT for jenkins user\n",
+                                "sudo su - jenkins --shell /bin/bash -c \"aws configure set region eu-central-1\" \n",
+                                "sudo su - jenkins --shell /bin/bash -c \"aws configure set output json\" \n",
+                                "#until [ -f /var/lib/jenkins/jenkins.install.InstallUtil.lastExecVersion ]; do   sleep 5; service jenkins restart; done\n",
+                                "while [ ! -f /var/lib/jenkins/jenkins.install.InstallUtil.lastExecVersion ]; do echo waiting for jenkins to finish setup; sleep 10; done; service jenkins restart\n",
+                "\n"
+                            ]
+                        ]
+                    }
+                },
+        "Tags" : [
+          {
+            "Key" : "Name",
+            "Value" : "Jenkins Server"
+          }
+        ]
+      }
+    },
+    "JenkinsSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Enable SSH and HTTP access from specific CIDR block",
+        "VpcId": {
+          "Ref": "VpcId"
+        },
+        "SecurityGroupIngress": [{
+          "IpProtocol": "tcp",
+          "FromPort": "22",
+          "ToPort": "22",
+          "CidrIp": {
+            "Ref": "YourIPRange"
+          }
+        }, {
+          "IpProtocol": "tcp",
+          "FromPort": "80",
+          "ToPort": "80",
+          "CidrIp": {
+            "Ref": "YourIPRange"
+          }
+        },
+        {
+      "IpProtocol": "tcp",
+      "FromPort": "8080",
+      "ToPort": "8080",
+      "CidrIp": {
+          "Ref": "YourIPRange"
+      }
+  }],
+        "SecurityGroupEgress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "0",
+                        "ToPort": "65535",
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ]
+      }
+    },
+    "ELBSG": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Enable HTTP access from anywhere",
+        "VpcId": {
+          "Ref": "VpcId"
+        },
+        "SecurityGroupIngress": [{
+          "IpProtocol": "tcp",
+          "FromPort": "80",
+          "ToPort": "80",
+          "CidrIp": "0.0.0.0/0"
+        }]
+      }
+    },
+    "WSSG": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Enable HTTP access from ELB",
+        "VpcId": {
+          "Ref": "VpcId"
+        },
+        "SecurityGroupIngress": [{
+          "IpProtocol": "tcp",
+          "FromPort": "22",
+          "ToPort": "22",
+          "CidrIp": {
+            "Ref": "YourIPRange"
+          }
+        }, {
+          "IpProtocol": "tcp",
+          "FromPort": "80",
+          "ToPort": "80",
+          "SourceSecurityGroupId" : {
+            "Ref" : "ELBSG"
+          }        
+        }]
+      }
+    },
+    "CodeDeployBucket" : {
+      "Type" : "AWS::S3::Bucket",
+      "Properties" : {
+            "VersioningConfiguration" : {
+                    "Status" : "Enabled"
+                  }
+             }
+      },
+
+            "JenkinsBucketPolicy":{
+            "Type":"AWS::S3::BucketPolicy",
+            "Properties":{
+                "Bucket":{
+                    "Ref":"CodeDeployBucket"
+                },
+                "PolicyDocument":{
+                    "Statement":[
+                        {
+                            "Sid":"IPAllow",
+                            "Effect":"Allow",
+                            "Action":[
+                                "s3:Get*","s3:List*"
+                            ],
+                            "Resource":{
+                                "Fn::Join":[
+                                    "",
+                                    [
+                                        "arn:aws:s3:::",
+                                        {
+                                            "Ref":"CodeDeployBucket"
+                                        },
+                                        "/*"
+                                    ]
+                                ]
+                            },
+                            "Principal":"*",
+                            "Condition":{
+                                "IpAddress":{
+                                    "aws:SourceIp":[
+                                        {"Fn::Join" : ["", [{"Fn::GetAtt":["JenkinsServer","PublicIp"]},"/24"]]}
+                                    ]
+                                    
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        
+    "JenkinsRole" : {
+      "Type" : "AWS::IAM::Role",
+      "Properties" : {
+        "Path" : "/",
+        "AssumeRolePolicyDocument" : {
+          "Statement" : [ {
+            "Effect" : "Allow",
+            "Principal" : {
+              "Service" : [ "ec2.amazonaws.com" ]
+            },
+            "Action" : [ "sts:AssumeRole" ]
+          } ]
+        }
+      }
+    },
+    "JenkinsInstanceProfile" : {
+      "Type" : "AWS::IAM::InstanceProfile",
+      "Properties" : {
+        "Path" : "/",
+        "Roles" : [ {
+          "Ref" : "JenkinsRole"
+        } ]
+      }
+    },
+    "JenkinsPolicy" : {
+      "Type" : "AWS::IAM::Policy",
+      "Properties" : {
+        "PolicyName" : "JenkinsPolicy",
+        "PolicyDocument" : {
+          "Version" : "2012-10-17",
+          "Statement" : [ {
+            "Effect" : "Allow",
+            "Action" : [ "s3:GetObject","s3:GetObjectVersion","s3:PutObject", "s3:DeleteObject"],
+            "Resource" : "*"
+                },
+            { 
+            "Effect" : "Allow",
+            "Action" : [ "codedeploy:ListApplications","codedeploy:ListDeploymentGroups","codedeploy:RegisterApplicationRevision","codedeploy:CreateDeployment","codedeploy:GetDeploymentConfig","codedeploy:GetApplicationRevision","codedeploy:GetDeployment" ],
+            "Resource" : "*"
+          }]
+        },
+        "Roles" : [ {
+          "Ref" : "JenkinsRole"
+        } ]
+      }
+    },
+    "CodeDeployTrustRole" : {
+      "Type" : "AWS::IAM::Role",
+      "Properties" : {
+        "AssumeRolePolicyDocument" : {
+          "Version" : "2008-10-17",
+          "Statement" : [ {
+            "Sid" : "1",
+            "Effect" : "Allow",
+            "Principal" : {
+              "Service" : "codedeploy.amazonaws.com"
+            },
+            "Action" : "sts:AssumeRole"
+          } ]
+        },
+        "Path" : "/"
+      }
+    },
+    "CodeDeployRolePolicies" : {
+      "Type" : "AWS::IAM::Policy",
+      "Properties" : {
+        "PolicyName" : "CodeDeployPolicy",
+        "PolicyDocument" : {
+          "Statement" : [ {
+            "Effect" : "Allow",
+            "Resource" : [ "*" ],
+            "Action" : [ "ec2:Describe*" ]
+          }, {
+            "Effect" : "Allow",
+            "Resource" : [ "*" ],
+            "Action" : [ "autoscaling:CompleteLifecycleAction", "autoscaling:DeleteLifecycleHook", "autoscaling:DescribeLifecycleHooks", "autoscaling:DescribeAutoScalingGroups", "autoscaling:PutLifecycleHook", "autoscaling:RecordLifecycleActionHeartbeat" ]
+          }, {
+            "Effect" : "Allow",
+            "Resource" : [ "*" ],
+            "Action" : [ "Tag:getResources", "Tag:getTags", "Tag:getTagsForResource", "Tag:getTagsForResourceList" ]
+          } ]
+        },
+        "Roles" : [ {
+          "Ref" : "CodeDeployTrustRole"
+        } ]
+      }
+    },
+    "InstanceRole" : {
+      "Type" : "AWS::IAM::Role",
+      "Properties" : {
+        "AssumeRolePolicyDocument" : {
+          "Statement" : [ {
+            "Effect" : "Allow",
+            "Principal" : {
+              "Service" : [ "ec2.amazonaws.com" ]
+            },
+            "Action" : [ "sts:AssumeRole" ]
+          } ]
+        },
+        "Path" : "/"
+      }
+    },
+    "InstanceRolePolicies" : {
+      "Type" : "AWS::IAM::Policy",
+      "Properties" : {
+        "PolicyName" : "InstanceRole",
+        "PolicyDocument" : {
+          "Statement" : [ {
+            "Effect" : "Allow",
+            "Action" : [ "autoscaling:Describe*", "cloudformation:Describe*", "cloudformation:GetTemplate", "s3:Get*","s3:List*" ],
+            "Resource" : "*"
+          } ]
+        },
+        "Roles" : [ {
+          "Ref" : "InstanceRole"
+        } ]
+      }
+    },
+    "CodeDeployInstanceProfile" : {
+      "Type" : "AWS::IAM::InstanceProfile",
+      "Properties" : {
+        "Path" : "/",
+        "Roles" : [ {
+          "Ref" : "InstanceRole"
+        } ]
+      }
+    },
+    
+    "WSASG" : {
+      "Type" : "AWS::AutoScaling::AutoScalingGroup",
+      "Properties" : {
+        "LaunchConfigurationName" : {
+          "Ref" : "WSLaunchConfiguration"
+        },
+        "VPCZoneIdentifier" : [ {
+          "Ref" : "PublicSubnet1"
+        }, {
+          "Ref" : "PublicSubnet2"
+        } ],
+        "MinSize" : 0,
+        "MaxSize" : 4,
+        "DesiredCapacity" : {
+          "Ref" : "InstanceCount"
+        },
+        "LoadBalancerNames": [
+          {
+            "Ref" : "ELB"
+          }
+        ], 
+        "HealthCheckType":"ELB",
+        "HealthCheckGracePeriod" : 600,
+        "Tags" : [ {
+          "Key" :  "Name",
+          "Value" : "CodeDeployDemo",
+          "PropagateAtLaunch" : "true"
+        } ]        
+      },
+      "CreationPolicy" : {
+        "ResourceSignal" : {
+          "Count": {
+            "Ref" : "InstanceCount"
+          },
+          "Timeout" : "PT15M"
+        }
+      },
+      "UpdatePolicy" : {
+        "AutoScalingRollingUpdate" : {
+          "MinInstancesInService" : "0",
+          "MaxBatchSize" : "1"
+        }
+      }
+    },
+    "WSLaunchConfiguration" : {
+      "Type" : "AWS::AutoScaling::LaunchConfiguration",
+      "Metadata" : {
+        "AWS::CloudFormation::Init" : {
+          "services" : {
+            "sysvint" : {
+              "codedeploy-agent" : {
+                "enabled" : "true",
+                "ensureRunning" : "true"
+              }
+            }
+          }
+        }
+      },
+      "Properties" : {
+         "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" }, "AMI"]},
+        "InstanceType" : {
+          "Ref" : "CodedeployInstanceType"
+        },
+        "SecurityGroups" : [ {
+          "Ref" : "WSSG"
+        } ],
+        "UserData" : {
+          "Fn::Base64" : {
+            "Fn::Join" : [ "", [ 
+              "#!/bin/bash -ex\n", 
+              "yum update -y aws-cfn-bootstrap\n", 
+              "yum install -y aws-cli\n", 
+              "# Helper function.\n", 
+              "function error_exit\n", 
+              "{\n", 
+                "  /opt/aws/bin/cfn-signal -e 1 ",
+                "         --stack ", { "Ref" : "AWS::StackName" },
+                "         --reason \"$1\" ",
+                "         --resource WebServerInstance ",
+                "         --region ", { "Ref" : "AWS::Region" }, "\n",
+                "  exit 1\n",
+              "}\n", 
+              "# Install the AWS CodeDeploy Agent.\n", 
+              "cd /home/ec2-user/\n", 
+              "aws s3 cp 's3://aws-codedeploy-", { "Ref" : "AWS::Region" }, "/latest/codedeploy-agent.noarch.rpm' . || error_exit 'Failed to download AWS CodeDeploy Agent.'\n", 
+              "yum install -y ruby || error_exit 'Failed to install AWS CodeDeploy Agent.' \n",
+              "yum -y install codedeploy-agent.noarch.rpm || error_exit 'Failed to install AWS CodeDeploy Agent.' \n", 
+              
+              "/opt/aws/bin/cfn-init --stack ", {"Ref" : "AWS::StackId"}, " --resource WSLaunchConfiguration --region ", {"Ref" : "AWS::Region"}, " || error_exit 'Failed to run cfn-init.'\n", 
+              "# Signal the status from cfn-init\n", 
+              "/opt/aws/bin/cfn-signal -e 0 ",
+              "         --stack ", { "Ref" : "AWS::StackName" },
+              "         --resource WSASG ",
+              "         --region ", { "Ref" : "AWS::Region" }, "\n"              
+              ] ]
+          }
+        },
+        "KeyName" : {
+          "Ref" : "KeyName"
+        },
+        "IamInstanceProfile" : {
+          "Ref" : "CodeDeployInstanceProfile"
+        },
+        "AssociatePublicIpAddress" : true
+      }
+    },
+    "ELB" : {
+      "Type" : "AWS::ElasticLoadBalancing::LoadBalancer",
+      "Properties" : {
+        "HealthCheck" : {
+          "HealthyThreshold" : "2",
+          "Interval" : "30",
+          "Target" : "HTTP:80/",
+          "Timeout" : "5",
+          "UnhealthyThreshold" : "5"
+        },
+        "Listeners" : [ {
+          "InstancePort" : "80",
+          "LoadBalancerPort" : "80",
+          "Protocol" : "HTTP",
+          "InstanceProtocol" : "HTTP",
+          "PolicyNames" : [ ]
+        } ],
+        "Subnets" : [ {
+          "Ref" : "PublicSubnet1"
+        }, {
+          "Ref" : "PublicSubnet2"
+        }  ],
+        "SecurityGroups" : [ {
+          "Ref" : "ELBSG"
+        } ]
+      }
+    },
+    "DemoApplication" : {
+      "Type" : "AWS::CodeDeploy::Application"
+    },
+    "DemoFleet" : {
+      "Type" : "AWS::CodeDeploy::DeploymentGroup",
+      "Properties" : {
+        "ApplicationName" : {
+          "Ref" : "DemoApplication"
+        },
+      "AutoScalingGroups" : [ {
+          "Ref" : "WSASG"
+        } ],
+        "Deployment" : {
+          "Description" : "Initial deployment",
+          "Revision" : {
+            "RevisionType" : "S3",
+            "S3Location" : {
+              "Bucket" : {
+                "Fn::Join" : [ "", ["aws-codedeploy-", { "Ref" : "AWS::Region" }]]
+              },
+              "BundleType" : "zip",
+              "Key" : "samples/latest/SampleApp_Linux.zip"
+            }  
+          }
+        },
+        "DeploymentConfigName" : "CodeDeployDefault.OneAtATime",
+        "ServiceRoleArn" : {
+          "Fn::GetAtt" : [ "CodeDeployTrustRole", "Arn" ]
+        }
+      }
+  }
+  },
+  "Outputs" : {
+    "ELBDNSName" : {
+      "Description" : "DNS Name of the ELB",
+      "Value" : {
+        "Fn::GetAtt" : [ "ELB", "DNSName" ]
+      }
+    },
+    "JenkinsServerDNSName" : {
+      "Description" : "DNS Name of Jenkins Server",
+      "Value" : {
+        "Fn::GetAtt" : [ "JenkinsServer", "PublicDnsName" ]
+      }
+    },
+    "CodeDeployApplicationName" : {
+      "Description" : "CodeDeploy Application Name",
+      "Value" : {
+        "Ref" : "DemoApplication"
+      }
+    },
+    "CodeDeployDeploymentGroup" : {
+      "Description" : "CodeDeploy Deployment Group Name",
+      "Value" : {
+        "Ref" : "DemoFleet"
+      }
+    },
+    "S3BucketName" : {
+      "Description" : "S3 Bucket Name",
+      "Value" : {
+        "Ref" : "CodeDeployBucket"
+      }
+    },
+    "CodeBuildProjectName" : {
+      "Description" : "CodeBuild Project Name",
+      "Value" : {
+        "Ref" : "CodBuildProject"
+      }
+    }
+  }
+}
