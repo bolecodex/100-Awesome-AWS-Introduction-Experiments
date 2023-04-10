@@ -1,0 +1,86 @@
+In this demo we will create an S3 bucket using AWS CLI commands. userwithpermissionboundary is a member of an AWS managed policy group (developers). By default, this group allows members to create S3 buckets. However, userwithpermissionboundary has an attached permissions boundary whose maximum access does not support Amazon S3 access. We will then update userwithpermissionboundary to grant Amazon S3 access. 
+Assumptions:
+AWS CLI is setup with multiple named profiles. (https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html)
+Users:
+userwithpermissionboundary  
+Administrator
+Policies 
+PowerUserAccess (https://console.aws.amazon.com/iam/home#/policies/arn:aws:iam::aws:policy/PowerUserAccess)
+AdministratorAccess (https://console.aws.amazon.com/iam/home#/policies/arn:aws:iam::aws:policy/AdministratorAccess)
+
+S3elevated
+
+{    "Version": "2012-10-17",
+     "Statement": [
+          {
+               "Effect": "Allow",
+               "Action": [
+	       "s3:*",
+	       "cloudwatch:*",
+	       "ec2:*"
+                ],
+                "Resource": "*"        
+           }
+      ]
+}
+
+
+S3restricted
+
+{    "Version": "2012-10-17",
+     "Statement": [
+          {
+               "Effect": "Allow",
+               "Action": [
+	        "cloudwatch:*",
+	        "ec2:*"
+                ],
+                "Resource": "*"        
+           }
+      ]
+}
+
+
+Groups
+Developers: 
+Permissions Policy = PowerUserAccess
+userwithpermissionboundary
+Admins 
+Permissions Policy = AdministratorAccess
+Administrator
+
+User with permissions boundary attached:
+userwithpermissionboundary = S3restricted
+
+
+Demo start
+
+aws configure --profile userwithpermissionboundary
+
+Create a bucket with the user  userwithpermissionboundary profile.
+aws s3 mb s3://bucketfordevonawsdemo --profile userwithpermissionboundary
+
+Our attempt will fail to create the bucket. Let’s investigate. 
+aws iam get-user --user-name userwithpermissionboundary
+
+View the users’ (userwithpermissionboundary) permissions boundary. 
+arn:aws:iam::111122223333:policy/S3restricted. 
+
+Let’s check the maximum level of access the permissions boundary allows.
+aws iam get-policy-version --policy-arn arn:aws:iam::111122223333:policy/S3restricted --version-id v1
+
+We will then update the users’ permissions boundary to a new permissions boundary that allows for S3 access. 
+arn:aws:iam::1234567891011:policy/S3elevated
+
+To accomplish the update, we will use the elevated permissions of another user (userwithiamaccess) to issue the put-user-permissions-boundary command. This command updates the user (userwithpermissionboundary) to a new permissions boundary that includes S3 access.
+aws iam put-user-permissions-boundary --permissions-boundary arn:aws:iam::111722413196:policy/S3elevated --user-name userwithpermissionboundary
+
+Let’s determine whether the user has been updated to the new permissions boundary.
+aws iam get-user --user-name userwithpermissionboundary
+
+We will then again attempt to create an S3 bucket using AWS CLI commands with the same user. 
+aws s3 mb s3://bucketfordevonawsdemo --profile userwithpermissionboundary
+aws s3 ls --profile userwithpermissionboundary
+aws s3 rb s3://bucketfordevonawsdemo --profile userwithpermissionboundary
+
+Success!
