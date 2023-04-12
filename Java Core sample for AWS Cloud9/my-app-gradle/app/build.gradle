@@ -1,0 +1,37 @@
+apply plugin: 'java'
+apply plugin: 'application'
+
+repositories {
+  jcenter()
+  mavenCentral()
+}
+
+buildscript {
+  repositories {
+    mavenCentral()
+  }
+  dependencies {
+    classpath "io.spring.gradle:dependency-management-plugin:1.0.3.RELEASE"
+  }
+}
+
+apply plugin: "io.spring.dependency-management"
+
+dependencyManagement {
+  imports {
+    mavenBom 'com.amazonaws:aws-java-sdk-bom:1.11.330'
+  }
+}
+
+dependencies {
+  implementation 'com.amazonaws:aws-java-sdk-s3'
+  testImplementation group: 'junit', name: 'junit', version: '4.12'
+}
+
+run {
+  if (project.hasProperty("appArgs")) {
+    args Eval.me(appArgs)
+  }
+}
+
+mainClassName = 'com.mycompany.app.App'
