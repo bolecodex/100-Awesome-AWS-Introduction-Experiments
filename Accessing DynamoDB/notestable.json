@@ -1,0 +1,27 @@
+{
+    "AttributeDefinitions": [
+        {"AttributeName": "UserId",
+         "AttributeType": "S"},
+        {"AttributeName": "NoteId",
+         "AttributeType": "N"},
+        {"AttributeName": "Is_Incomplete",
+         "AttributeType": "S"}],
+    "TableName": "Notes",
+    "KeySchema": [
+        {"AttributeName": "UserId",
+         "KeyType": "HASH"},
+        {"AttributeName": "NoteId",
+         "KeyType": "RANGE"}],
+    "ProvisionedThroughput": {
+        "ReadCapacityUnits": 1,
+        "WriteCapacityUnits": 1},
+    "LocalSecondaryIndexes": [
+        {"IndexName": "Review",
+         "KeySchema": [
+             {"AttributeName": "UserId",
+              "KeyType": "HASH"},
+             {"AttributeName": "Is_Incomplete",
+              "KeyType": "RANGE"}],
+         "Projection": 
+             {"ProjectionType": "ALL"}}]
+}
