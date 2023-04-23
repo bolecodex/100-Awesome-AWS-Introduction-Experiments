@@ -1,0 +1,48 @@
+using Amazon;
+using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2.DataModel;
+using Amazon.DynamoDBv2.DocumentModel;
+using Amazon.DynamoDBv2.Model;
+using Amazon.Runtime;
+using System.Threading.Tasks;
+
+namespace DynamoDBDocument
+{
+  class Program
+  {
+        public static async Task Main(string[] args)
+        {
+            AmazonDynamoDBClient client = new AmazonDynamoDBClient();
+
+            Table table = Table.LoadTable(client, "ProductCatalog");
+            Document document = await table.GetItemAsync(102); // Primary key 101.
+
+            // Do something with the document.
+            if (document != null)
+            {
+                Console.WriteLine(document.ToJsonPretty());
+            }
+            else
+            {
+                Console.WriteLine("No matching item found.");
+            }
+
+            Console.WriteLine("Press any key to exit...");
+            Console.ReadKey();
+            
+            var book = new Document();
+
+            // Set the attributes that you wish to update.
+            book["Id"] = 111; // Primary key.
+            // Replace the authors attribute.
+            book["Authors"] = new List<string> { "Author x", "Author y" };
+            // Add a new attribute.
+            book["XYZ"] = 12345;
+            // Delete the existing PageCount attribute.
+            book["PageCount"] = null;
+            
+            table.UpdateItemAsync(book);
+            
+        }
+  }
+}

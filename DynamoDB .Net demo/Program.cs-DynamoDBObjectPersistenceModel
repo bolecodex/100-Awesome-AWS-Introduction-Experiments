@@ -1,0 +1,105 @@
+using System;
+using System.Collections.Generic;
+using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2.DataModel;
+
+
+using Amazon.Runtime;
+
+namespace DynamoDBObjectPersistenceModel
+{
+    [DynamoDBTable("ProductCatalog")]
+    public class Book
+    {
+        [DynamoDBHashKey] //Partition key
+        public int Id
+        {
+            get; set;
+        }
+        [DynamoDBProperty]
+        public string Title
+        {
+            get; set;
+        }
+        [DynamoDBProperty]
+        public string ISBN
+        {
+            get; set;
+        }
+        [DynamoDBProperty("Authors")] //String Set datatype
+        public List<string> BookAuthors
+        {
+            get; set;
+        }
+    }
+    class HighLevelItemCRUD
+    {
+        private static AmazonDynamoDBClient client = new AmazonDynamoDBClient();
+
+        static void Main(string[] args)
+        {
+            try
+            {
+                DynamoDBContext context = new DynamoDBContext(client);
+                TestCRUDOperations(context);
+                Console.WriteLine("To continue, press Enter");
+                Console.ReadLine();
+            }
+            catch (AmazonDynamoDBException e) { Console.WriteLine(e.Message); }
+            catch (AmazonServiceException e) { Console.WriteLine(e.Message); }
+            catch (Exception e) { Console.WriteLine(e.Message); }
+        }
+
+        private static async Task TestCRUDOperations(DynamoDBContext context)
+        {
+            int bookID = 1001; // Some unique value.
+            Book myBook = new Book
+            {
+                Id = bookID,
+                Title = "object persistence-AWS SDK for.NET SDK-Book 1001",
+                ISBN = "111-1111111001",
+                BookAuthors = new List<string> { "Author 1", "Author 2" },
+            };
+        
+            // Save the book.
+            await context.SaveAsync(myBook);
+            Console.WriteLine("Book saved");
+        
+            // Retrieve the book.
+            Book bookRetrieved = await context.LoadAsync<Book>(bookID);
+            Console.WriteLine("Book retrieved:\n" + bookRetrieved.Title + " - " + bookRetrieved.ISBN);
+        
+            // Update few properties.
+            bookRetrieved.ISBN = "222-2222221001";
+            bookRetrieved.BookAuthors = new List<string> { " Author 1", "Author x" }; // Replace existing authors list with this.
+            await context.SaveAsync(bookRetrieved);
+            Console.WriteLine("Book updated");
+        
+            // Retrieve the updated book. This time add the optional ConsistentRead parameter using DynamoDBContextConfig object.
+            Book updatedBook = await context.LoadAsync<Book>(bookID, new DynamoDBContextConfig
+            {
+                ConsistentRead = true
+            });
+            Console.WriteLine("Updated book retrieved:\n" + updatedBook.Title + " - " + updatedBook.ISBN);
+        
+            // Delete the book.
+            await context.DeleteAsync<Book>(bookID);
+            Console.WriteLine("Book deleted");
+        
+            // Try to retrieve deleted book. It should return null.
+            Book deletedBook = await context.LoadAsync<Book>(bookID, new DynamoDBContextConfig
+            {
+                ConsistentRead = true
+            });
+            if (deletedBook == null)
+            {
+                Console.WriteLine("Book is deleted");
+            }
+            else
+            {
+                Console.WriteLine("Error: Book still exists");
+            }
+        }
+    }
+
+}
