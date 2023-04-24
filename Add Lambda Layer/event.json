@@ -1,0 +1,11 @@
+{
+  "body": {
+    "id": "1",
+    "name": "Java",
+    "author": "Alex",
+    "category": "IT",
+    "price": "10.89",
+    "description": "This book guide to create Java web basic",
+    "image": "https://book-image-resize-store.s3.ap-southeast-2.amazonaws.com/Java.jpg"
+  }
+}
