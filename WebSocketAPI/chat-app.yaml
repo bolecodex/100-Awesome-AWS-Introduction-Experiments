@@ -1,0 +1,363 @@
+Resources:
+  ConnectionsTable8000B8A1:
+    Type: 'AWS::DynamoDB::Table'
+    Properties:
+      KeySchema:
+        - AttributeName: connectionId
+          KeyType: HASH
+      AttributeDefinitions:
+        - AttributeName: connectionId
+          AttributeType: S
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+  ConnectHandlerServiceRole7E4A9B1F:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: 2012-10-17
+      ManagedPolicyArns:
+        - !Join 
+          - ''
+          - - 'arn:'
+            - !Ref 'AWS::Partition'
+            - ':iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+  ConnectHandlerServiceRoleDefaultPolicy7DE94863:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - 'dynamodb:BatchWriteItem'
+              - 'dynamodb:PutItem'
+              - 'dynamodb:UpdateItem'
+              - 'dynamodb:DeleteItem'
+            Effect: Allow
+            Resource:
+              - !GetAtt 
+                - ConnectionsTable8000B8A1
+                - Arn
+              - !Ref 'AWS::NoValue'
+        Version: 2012-10-17
+      PolicyName: ConnectHandlerServiceRoleDefaultPolicy7DE94863
+      Roles:
+        - !Ref ConnectHandlerServiceRole7E4A9B1F
+  ConnectHandler2FFD52D8:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Code:
+        ZipFile: |-
+          const AWS = require('aws-sdk');
+                const ddb = new AWS.DynamoDB.DocumentClient();
+                exports.handler = async function (event, context) {
+                  try {
+                    await ddb
+                      .put({
+                        TableName: process.env.table,
+                        Item: {
+                          connectionId: event.requestContext.connectionId,
+                        },
+                      })
+                      .promise();
+                  } catch (err) {
+                    return {
+                      statusCode: 500,
+                    };
+                  }
+                  return {
+                    statusCode: 200,
+                  };
+                };
+      Role: !GetAtt 
+        - ConnectHandlerServiceRole7E4A9B1F
+        - Arn
+      Environment:
+        Variables:
+          table: !Ref ConnectionsTable8000B8A1
+      Handler: index.handler
+      Runtime: nodejs14.x
+    DependsOn:
+      - ConnectHandlerServiceRoleDefaultPolicy7DE94863
+      - ConnectHandlerServiceRole7E4A9B1F
+  DisconnectHandlerServiceRoleE54F14F9:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: 2012-10-17
+      ManagedPolicyArns:
+        - !Join 
+          - ''
+          - - 'arn:'
+            - !Ref 'AWS::Partition'
+            - ':iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+  DisconnectHandlerServiceRoleDefaultPolicy1800B9E5:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - 'dynamodb:BatchWriteItem'
+              - 'dynamodb:PutItem'
+              - 'dynamodb:UpdateItem'
+              - 'dynamodb:DeleteItem'
+            Effect: Allow
+            Resource:
+              - !GetAtt 
+                - ConnectionsTable8000B8A1
+                - Arn
+              - !Ref 'AWS::NoValue'
+        Version: 2012-10-17
+      PolicyName: DisconnectHandlerServiceRoleDefaultPolicy1800B9E5
+      Roles:
+        - !Ref DisconnectHandlerServiceRoleE54F14F9
+  DisconnectHandlerCB7ED6F7:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Code:
+        ZipFile: |-
+          const AWS = require('aws-sdk');
+                const ddb = new AWS.DynamoDB.DocumentClient();
+                
+                exports.handler = async function (event, context) {
+                  await ddb
+                    .delete({
+                      TableName: process.env.table,
+                      Key: {
+                        connectionId: event.requestContext.connectionId,
+                      },
+                    })
+                    .promise();
+                  return {
+                    statusCode: 200,
+                  };
+                };
+      Role: !GetAtt 
+        - DisconnectHandlerServiceRoleE54F14F9
+        - Arn
+      Environment:
+        Variables:
+          table: !Ref ConnectionsTable8000B8A1
+      Handler: index.handler
+      Runtime: nodejs14.x
+    DependsOn:
+      - DisconnectHandlerServiceRoleDefaultPolicy1800B9E5
+      - DisconnectHandlerServiceRoleE54F14F9
+  MessageHandlerServiceRoleDF05266A:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: 2012-10-17
+      ManagedPolicyArns:
+        - !Join 
+          - ''
+          - - 'arn:'
+            - !Ref 'AWS::Partition'
+            - ':iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+  MessageHandlerServiceRoleDefaultPolicyD818A6AA:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - 'dynamodb:BatchGetItem'
+              - 'dynamodb:GetRecords'
+              - 'dynamodb:GetShardIterator'
+              - 'dynamodb:Query'
+              - 'dynamodb:GetItem'
+              - 'dynamodb:Scan'
+              - 'dynamodb:ConditionCheckItem'
+            Effect: Allow
+            Resource:
+              - !GetAtt 
+                - ConnectionsTable8000B8A1
+                - Arn
+              - !Ref 'AWS::NoValue'
+        Version: 2012-10-17
+      PolicyName: MessageHandlerServiceRoleDefaultPolicyD818A6AA
+      Roles:
+        - !Ref MessageHandlerServiceRoleDF05266A
+  SendMessageHandlerDFBBCD6B:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Code:
+        ZipFile: |-
+          const AWS = require('aws-sdk');
+                const ddb = new AWS.DynamoDB.DocumentClient();
+                
+                exports.handler = async function (event, context) {
+                  let connections;
+                  try {
+                    connections = await ddb.scan({ TableName: process.env.table }).promise();
+                  } catch (err) {
+                    return {
+                      statusCode: 500,
+                    };
+                  }
+                  const callbackAPI = new AWS.ApiGatewayManagementApi({
+                    apiVersion: '2018-11-29',
+                    endpoint:
+                      event.requestContext.domainName + '/' + event.requestContext.stage,
+                  });
+                
+                  const message = JSON.parse(event.body).message;
+                
+                  const sendMessages = connections.Items.map(async ({ connectionId }) => {
+                    if (connectionId !== event.requestContext.connectionId) {
+                      try {
+                        await callbackAPI
+                          .postToConnection({ ConnectionId: connectionId, Data: message })
+                          .promise();
+                      } catch (e) {
+                        console.log(e);
+                      }
+                    }
+                  });
+                
+                  try {
+                    await Promise.all(sendMessages);
+                  } catch (e) {
+                    console.log(e);
+                    return {
+                      statusCode: 500,
+                    };
+                  }
+                
+                  return { statusCode: 200 };
+                };
+      Role: !GetAtt 
+        - MessageHandlerServiceRoleDF05266A
+        - Arn
+      Environment:
+        Variables:
+          table: !Ref ConnectionsTable8000B8A1
+      Handler: index.handler
+      Runtime: nodejs14.x
+    DependsOn:
+      - MessageHandlerServiceRoleDefaultPolicyD818A6AA
+      - MessageHandlerServiceRoleDF05266A
+  DefaultHandlerServiceRoleDF00569C:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: 2012-10-17
+      ManagedPolicyArns:
+        - !Join 
+          - ''
+          - - 'arn:'
+            - !Ref 'AWS::Partition'
+            - ':iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+  DefaultHandlerServiceRoleDefaultPolicy2F57C32F:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action: 'execute-api:ManageConnections'
+            Effect: Allow
+            Resource: !Join 
+              - ''
+              - - 'arn:aws:execute-api:'
+                - !Ref 'AWS::Region'
+                - ':'
+                - !Ref 'AWS::AccountId'
+                - ':*/*/POST/@connections/*'
+          - Action: 'execute-api:ManageConnections'
+            Effect: Allow
+            Resource: !Join 
+              - ''
+              - - 'arn:aws:execute-api:'
+                - !Ref 'AWS::Region'
+                - ':'
+                - !Ref 'AWS::AccountId'
+                - ':*/*/GET/@connections/*'
+        Version: 2012-10-17
+      PolicyName: DefaultHandlerServiceRoleDefaultPolicy2F57C32F
+      Roles:
+        - !Ref DefaultHandlerServiceRoleDF00569C
+  DefaultHandler604DF7AC:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Code:
+        ZipFile: |-
+          const AWS = require('aws-sdk');
+
+                exports.handler = async function (event, context) {
+                  let connectionInfo;
+                  let connectionId = event.requestContext.connectionId;
+                
+                  const callbackAPI = new AWS.ApiGatewayManagementApi({
+                    apiVersion: '2018-11-29',
+                    endpoint:
+                      event.requestContext.domainName + '/' + event.requestContext.stage,
+                  });
+                
+                  try {
+                    connectionInfo = await callbackAPI
+                      .getConnection({ ConnectionId: event.requestContext.connectionId })
+                      .promise();
+                  } catch (e) {
+                    console.log(e);
+                  }
+                
+                  connectionInfo.connectionID = connectionId;
+                
+                  await callbackAPI
+                    .postToConnection({
+                      ConnectionId: event.requestContext.connectionId,
+                      Data:
+                        'Use the sendmessage route to send a message. Your info:' +
+                        JSON.stringify(connectionInfo),
+                    })
+                    .promise();
+                
+                  return {
+                    statusCode: 200,
+                  };
+                };
+      Role: !GetAtt 
+        - DefaultHandlerServiceRoleDF00569C
+        - Arn
+      Handler: index.handler
+      Runtime: nodejs14.x
+    DependsOn:
+      - DefaultHandlerServiceRoleDefaultPolicy2F57C32F
+      - DefaultHandlerServiceRoleDF00569C
+  manageConnections7F91357B:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action: 'execute-api:ManageConnections'
+            Effect: Allow
+            Resource: !Join 
+              - ''
+              - - 'arn:aws:execute-api:'
+                - !Ref 'AWS::Region'
+                - ':'
+                - !Ref 'AWS::AccountId'
+                - ':*/*/POST/@connections/*'
+        Version: 2012-10-17
+      PolicyName: manageConnections7F91357B
+      Roles:
+        - !Ref MessageHandlerServiceRoleDF05266A
