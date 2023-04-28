@@ -1,0 +1,7 @@
+#set($inputRoot = $input.path('$'))
+{
+  "city": "$input.params('city')",
+  "time": "$input.params('time')",
+  "day":  "$input.params('day')",
+  "name": "$inputRoot.callerName"
+}
