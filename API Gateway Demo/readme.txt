@@ -14,3 +14,6 @@ curl -v -X POST \
   -d '{
     "callerName": "John"
 }'
+
+# Swagger
+aws apigateway test-invoke-method --rest-api-id vv8uqn69j8 --resource-id 98rnog --http-method GET --path-with-query-string '/validation?q1=cat'
