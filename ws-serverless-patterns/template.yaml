@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  SAM Template for Serverless Patterns - v2 Lambda function
+
+Globals:
+  Function:
+    Runtime: python3.9
+    MemorySize: 128
+    Timeout: 100
+    Tracing: Active
+
+Resources:
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub  ${AWS::StackName}-Users
+      AttributeDefinitions:
+        - AttributeName: userid
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userid
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  UsersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/api/users.lambda_handler
+      Description: Handler for all users related operations
+      Environment:
+        Variables:
+          USERS_TABLE: !Ref UsersTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+      Tags:
+        Stack: !Sub "${AWS::StackName}"
+
+Outputs:
+  UsersTable:
+    Description: DynamoDB Users table
+    Value: !Ref UsersTable
+
+  UsersFunction:
+    Description: "Lambda function used to perform actions on the users data"
+    Value: !Ref UsersFunction
