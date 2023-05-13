@@ -4,9 +4,9 @@ sam init
 cd sam-app
 sam build
 sam local invoke
-sam deploy --guided
 sam local start-api
-curl -w '\n' http://127.0.0.1:3000/hello
+curl http://127.0.0.1:3000/hello
+sam deploy --guided
 sam delete
 
 
