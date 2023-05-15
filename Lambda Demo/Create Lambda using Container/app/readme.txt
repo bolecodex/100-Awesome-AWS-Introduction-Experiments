@@ -7,3 +7,7 @@ docker build -t hello-world .
 docker tag hello-world:latest 071908484098.dkr.ecr.us-east-1.amazonaws.com/hello-world:latest
 
 docker push 071908484098.dkr.ecr.us-east-1.amazonaws.com/hello-world:latest
+
+
+AWS Dojo - Workshop - Create Lambda with Container Based Runtime
+https://aws-dojo.com/ws38/labs/
