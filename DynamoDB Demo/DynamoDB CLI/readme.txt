@@ -16,3 +16,5 @@ aws dynamodb update-item --table-name Notes --key '{"UserId": {"S": "StudentD"},
 aws dynamodb update-item --table-name Notes --key '{"UserId": {"S": "StudentB"}, "NoteId": {"N": "12"}}' --update-expression "SET Notes = :newnote" --condition-expression "NOT attribute_exists(Favorite)" --expression-attribute-values file://expression-attribute-values.json
 
 aws dynamodb delete-item --table-name Notes --key '{"UserId": {"S": "StudentD"}, "NoteId": {"N": "42"}}' --return-values ALL_OLD
+
+aws dynamodb delete-table --table-name Notes
