@@ -12,8 +12,7 @@ docker-compose up
 # add "--color off" at the end of command if  output format broken in Windows 
 aws dynamodb list-tables --endpoint-url http://localhost:8000
 
-SELEC FROM Music WHERE Artist=? and SongTitle=?
-
+# PartiQL statement
 SELECT * FROM "Music" WHERE "Artist" = 'Acme Band' AND "SongTitle" = 'PartiQL Rocks'
 
 
