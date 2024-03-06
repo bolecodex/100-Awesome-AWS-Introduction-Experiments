@@ -1,5 +1,7 @@
 # Check the security group of EFS Mount Target Point, all NFS protocol traffic access from the EC2 security group
 
+# Or, create EFS Security Group with allow all NFS traffic and then replace EFS Security Group in EFS Network tab
+
 # Enter EC2 Linux 2 Instance, create mount folder
 sudo mkdir efs
 
