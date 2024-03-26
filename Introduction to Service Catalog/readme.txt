@@ -1,0 +1,1 @@
+https://docs.aws.amazon.com/servicecatalog/latest/adminguide/getstarted-CFN.html
