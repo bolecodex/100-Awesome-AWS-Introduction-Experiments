@@ -16,7 +16,7 @@ def get_file(url):
         return None
 
 
-# 2.) Function to upload to s3
+# 2.) #Function to upload a file to S3 using server side encryption
 
 
 def upload_to_s3(file, bucket_name, key):
